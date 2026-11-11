@@ -17,6 +17,16 @@ const S = {
 };
 
 // ───────── 유틸
+S.fresh = new Set();
+const CHECK_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path pathLength="1" d="M3.5 8.5l3 3 6-7"/></svg>';
+const SPIN = '<span class="spin" aria-hidden="true"></span>';
+const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+// 시트(설정 화면) 닫기: Ease in으로 내려간 뒤 다음 화면
+function closeSheet(next) {
+  const w = $('#app > .wrap');
+  if (!w || reduced()) return next();
+  w.classList.add('sheet-out'); setTimeout(next, 220);
+}
 let toastT;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
 const sha256hex = async (s) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -68,7 +78,8 @@ function renderPartialOnline() { /* 설정 편집 중엔 화면을 다시 그리
 async function setCheck(chore, next) {
   const wk = S.wk; const cur = (S.checks[wk] ||= {});
   const prev = cur[chore.id] || 0; if (next === prev) return;
-  cur[chore.id] = next; S.pending++; render();
+  for (let i = prev + 1; i <= next; i++) S.fresh.add(chore.id + ':' + i); // 새로 체크된 칸만 애니메이션
+  cur[chore.id] = next; S.pending++; render(); S.fresh.clear();
   const { error } = await rpc('hw_set_check', { p_wk: wk, p_chore: chore.id, p_done: next, p_who: S.who });
   S.pending--;
   if (error) { cur[chore.id] = prev; if (isAuthErr(error)) onError(error); else { toast('저장 실패 — 연결을 확인해 주세요'); S.online = false; } render(); }
@@ -132,10 +143,11 @@ async function testPush() {
 function render() {
   const app = $('#app');
   if (!S.key) return (app.innerHTML = keyScreen());
-  if (!S.cfg) return (app.innerHTML = `<div class="wrap"><div class="center"><h1>집안일</h1><p class="note">불러오는 중…</p></div></div>`);
+  if (!S.cfg) return (app.innerHTML = `<div class="wrap"><div class="center"><h1>집안일 임무분담제</h1><p class="note">${SPIN}불러오는 중…</p></div></div>`);
   if (!S.who) return (app.innerHTML = whoScreen());
   if (S.view === 'settings') return renderSettings();
   const st = window.scrollY; app.innerHTML = mainScreen(); window.scrollTo(0, st);
+  if (!S.introDone) { app.firstElementChild.classList.add('intro'); S.introDone = true; } // 첫 화면에서만 Stagger
 }
 const keyScreen = () => `<div class="wrap"><form class="center" data-act="key"><h1>집안일</h1><p class="note">공유받은 주소로 들어오면 자동으로 열려요. 아니라면 비밀 키를 입력해 주세요.</p>
   <input type="password" name="k" placeholder="비밀 키" autocomplete="off" autocapitalize="off" required>${S.keyError ? '<div class="err">키가 맞지 않아요.</div>' : ''}
@@ -154,7 +166,7 @@ function mainScreen() {
     const doneMin = list.reduce((a, c) => a + Math.min(checks[c.id] || 0, c.per) * c.min, 0);
     const rows = list.map((c) => {
       const d = Math.min(checks[c.id] || 0, c.per);
-      const pip = (i) => `<button class="pipbtn${c.per === 1 ? ' solo' : ''}" data-act="pip" data-c="${esc(c.id)}" data-i="${i}" aria-pressed="${i <= d}" aria-label="${esc(c.name)} ${i}번째"><span class="pip${i <= d ? ' on' : ''}"></span></button>`;
+      const pip = (i) => `<button class="pipbtn${c.per === 1 ? ' solo' : ''}" data-act="pip" data-c="${esc(c.id)}" data-i="${i}" aria-pressed="${i <= d}" aria-label="${esc(c.name)} ${i}번째"><span class="pip${i <= d ? ' on' : ''}${i <= d && S.fresh.has(c.id + ':' + i) ? ' draw' : ''}">${i <= d ? CHECK_SVG : ''}</span></button>`;
       const pips = Array.from({ length: c.per }, (_, i) => pip(i + 1)).join('');
       return `<div class="chore${d >= c.per ? ' full' : ''}"><div class="row"><span class="nm">${esc(c.name)}</span><span class="meta">${c.min}분 × ${c.per}${c.per === 1 ? '' : ` · ${d}/${c.per}`}</span>${c.per === 1 ? pips : ''}</div>${c.per > 1 ? `<div class="pips">${pips}</div>` : ''}</div>`;
     }).join('');
@@ -180,7 +192,7 @@ function mainScreen() {
 }
 
 // ───────── 설정(편집)
-function openSettings() { S.draft = JSON.parse(JSON.stringify(S.cfg)); S.view = 'settings'; S.armed = false; getPush().then((p) => { S.push = p; if (S.view === 'settings') renderSettings(); }); renderSettings(); window.scrollTo(0, 0); }
+function openSettings() { S.draft = JSON.parse(JSON.stringify(S.cfg)); S.view = 'settings'; S.armed = false; getPush().then((p) => { S.push = p; if (S.view === 'settings') renderSettings(); }); renderSettings(); window.scrollTo(0, 0); $('#app > .wrap').classList.add('sheet-in'); }
 function renderSettings() {
   const d = S.draft, p = S.push, theme = ls.get('hw_theme') || 'auto';
   let pushHtml;
@@ -191,9 +203,9 @@ function renderSettings() {
   } else if (p.perm === 'denied') {
     pushHtml = `<div class="status bad"><i></i>알림이 차단돼 있어요</div><p class="note">${p.ios ? '아이폰 설정 → 알림 → 집안일' : '브라우저 사이트 설정'}에서 알림을 허용한 뒤 다시 열어 주세요.</p>`;
   } else if (p.perm === 'granted' && p.subscribed) {
-    pushHtml = `<div class="status ok"><i></i>이 기기 알림 켜짐 (${esc(nm(S.who))})</div><div class="row2"><button class="btn primary" data-act="test" ${S.busy ? 'disabled' : ''}>테스트 푸시 보내기</button><button class="btn sm" data-act="pushoff">끄기</button></div>`;
+    pushHtml = `<div class="status ok"><i></i>이 기기 알림 켜짐 (${esc(nm(S.who))})</div><div class="row2"><button class="btn primary" data-act="test" ${S.busy ? 'disabled' : ''}>${S.busy ? SPIN : ''}테스트 푸시 보내기</button><button class="btn sm" data-act="pushoff">끄기</button></div>`;
   } else {
-    pushHtml = `<div class="status"><i></i>알림 꺼짐</div><button class="btn primary" data-act="pushon" ${S.busy ? 'disabled' : ''}>알림 켜기</button><p class="note">체크 알림, 월요일 09:00 이번 주 담당, 매일 20:00 남은 일을 받아요.</p>`;
+    pushHtml = `<div class="status"><i></i>알림 꺼짐</div><button class="btn primary" data-act="pushon" ${S.busy ? 'disabled' : ''}>${S.busy ? SPIN : ''}알림 켜기</button><p class="note">체크 알림, 월요일 09:00 이번 주 담당, 매일 20:00 남은 일을 받아요.</p>`;
   }
   const chores = d.chores.map((c, i) => `<div class="erow" data-i="${i}"><div class="l"><input type="text" data-f="name" value="${esc(c.name)}" aria-label="집안일 이름" maxlength="40"><button class="iconbtn" data-act="del" data-i="${i}" aria-label="삭제">🗑</button></div>
     <div class="grid3"><div class="field"><label>1회 분</label><input type="number" inputmode="numeric" min="0" max="999" data-f="min" value="${c.min}"></div>
@@ -215,7 +227,7 @@ async function saveCfg(cfg, msg) {
   const clean = C.sanitizeConfig(cfg);
   const { error } = await rpc('hw_save_config', { p_data: clean });
   if (error) { if (isAuthErr(error)) return onError(error); return toast('저장 실패 — 연결을 확인해 주세요'); }
-  S.cfg = clean; S.draft = null; S.view = 'main'; toast(msg || '저장했어요'); render(); refresh();
+  closeSheet(() => { S.cfg = clean; S.draft = null; S.view = 'main'; toast(msg || '저장했어요'); render(); refresh(); });
 }
 
 // ───────── 이벤트(위임)
@@ -230,7 +242,7 @@ document.addEventListener('click', async (e) => {
   if (a === 'next') { S.wk = C.addDays(S.wk, 7); return render(); }
   if (a === 'today') { S.wk = C.mondayOf(C.kstNow().ymd); return render(); }
   if (a === 'settings') return openSettings();
-  if (a === 'back') { S.view = 'main'; S.draft = null; return render(); }
+  if (a === 'back') return closeSheet(() => { S.view = 'main'; S.draft = null; render(); });
   if (a === 'who') { S.who = el.dataset.v; ls.set('hw_who', S.who); render(); getPush().then(async (p) => { if (p.subscribed && p.perm === 'granted') { try { await pushSubscribe(); } catch { /* noop */ } } }); return; }
   if (a === 'chwho') { S.who = null; ls.del('hw_who'); S.view = 'main'; return render(); }
   if (a === 'theme') { ls.set('hw_theme', el.dataset.v); applyTheme(); return renderSettings(); }

@@ -73,7 +73,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
 .pipbtn { width: 44px; height: 44px; display: grid; place-items: center; }
 .pip { width: 28px; height: 28px; border-radius: 9px; border: 2px solid var(--line); background: var(--field); display: grid; place-items: center; color: #fff; font-size: 16px; font-weight: 800; transition: transform .1s, background .15s; }
 .pipbtn:active .pip { transform: scale(.9); }
-.pip.on::after { content: "✓"; }
+/* 체크 표시는 SVG 선(아래 모션 섹션) */
 .person.b .pip.on { color: #1a1d24; }
 .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
 .chore .pipbtn.solo { margin: -8px -6px -8px 0; }
@@ -111,8 +111,8 @@ input:focus, select:focus { border-color: var(--a); }
 .who-btn { height: 72px; border-radius: 18px; font-size: 20px; font-weight: 800; background: var(--card); border: 2px solid var(--line); }
 .who-btn.a { color: var(--a); border-color: var(--a); } .who-btn.b { color: var(--b); border-color: var(--b); }
 .err { color: var(--danger); font-size: 14px; }
-#toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px); background: #1a1d24; color: #fff; padding: 10px 16px; border-radius: 99px; font-size: 14px; opacity: 0; pointer-events: none; transition: .2s; max-width: 90vw; z-index: 20; }
-#toast.show { opacity: 1; transform: translate(-50%, 0); }
+#toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #1a1d24; color: #fff; padding: 10px 16px; border-radius: 99px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s var(--ease-in); max-width: 90vw; z-index: 20; }
+#toast.show { opacity: 1; transition: opacity .25s var(--ease-out); }
 .chore .meta { margin-left: auto; }
 
 /* 더블탭 확대 방지 */
@@ -125,3 +125,35 @@ input:focus, select:focus { border-color: var(--a); }
 .day .dn { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 600; }
 .day.today .dn { background: var(--a); color: #fff; }
 .day.today .dw { color: var(--a); font-weight: 700; }
+
+/* ───────── 모션 (들어올 때 Ease out, 나갈 때 Ease in, 0.2~0.4s) */
+:root {
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-in: cubic-bezier(.55, 0, 1, .45);
+  --ease-io: cubic-bezier(.65, 0, .35, 1);
+  --spring: cubic-bezier(.34, 1.56, .64, 1); /* 살짝 넘쳤다 돌아오는 스프링 */
+}
+/* 체크칸: Spring으로 톡 + 체크 선 그리기(Ease in out) */
+.pip svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.pip.draw { animation: pip-pop .35s var(--spring); }
+.pip.draw path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: pip-draw .3s var(--ease-io) .05s forwards; }
+@keyframes pip-pop { from { transform: scale(.75); } to { transform: scale(1); } }
+@keyframes pip-draw { to { stroke-dashoffset: 0; } }
+/* 설정 화면 = 바텀시트: 아래에서 Slide in(Ease out), 닫을 때 Slide out(Ease in) */
+.sheet-in { animation: sheet-in .35s var(--ease-out); }
+.sheet-out { animation: sheet-out .22s var(--ease-in) forwards; }
+@keyframes sheet-in { from { transform: translateY(64px); opacity: 0; } }
+@keyframes sheet-out { to { transform: translateY(64px); opacity: 0; } }
+/* 로딩: Linear로 일정하게 회전 */
+.spin { display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* 타이틀·서브타이틀: Stagger로 한 줄씩(Ease out) */
+.intro .apptitle, .intro .top .weektitle, .intro .days, .center > * { animation: rise .35s var(--ease-out) both; }
+.intro .top .weektitle, .center > :nth-child(2) { animation-delay: .07s; }
+.intro .days, .center > :nth-child(3) { animation-delay: .14s; }
+.center > :nth-child(4) { animation-delay: .21s; }
+@keyframes rise { from { transform: translateY(8px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; }
+  .spin { animation: spin 1.2s linear infinite !important; }
+}
