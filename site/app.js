@@ -261,7 +261,7 @@ async function dynamicManifest() {
 (async function init() {
   applyTheme();
   const uk = urlKey(); if (uk) ls.set('hw_key', uk);
-  S.key = uk || ls.get('hw_key'); S.who = ls.get('hw_who');
+  S.key = window.HW.KEY || uk || ls.get('hw_key'); S.who = ls.get('hw_who');
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then((r) => { swReg = r; }).catch(() => {});
   try { const c = JSON.parse(ls.get('hw_cache') || 'null'); if (c) applyServer(c); } catch { /* noop */ }
   render();
