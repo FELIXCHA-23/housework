@@ -8,7 +8,7 @@
 <style>
 :root { --bg:#0e1013; --card:#171a20; --text:#eceff4; --muted:#98a2b3; --line:#2a2f38; --a:#7fa3ff; --a-soft:#1b2744; --b:#ff8f68; --b-soft:#3a2118; --ok:#4cc38a; }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; cursor: none; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
 body { font: 2.2vh/1.3 "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif; }
 #tv { height: 100vh; padding: 3vh 3vw; display: flex; flex-direction: column; gap: 2.4vh; }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 2vw; }
@@ -34,6 +34,8 @@ body { font: 2.2vh/1.3 "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", s
 .row.full .nm { color: var(--muted); text-decoration: line-through; text-decoration-thickness: .2vh; }
 .row.late .nm { color: #ffd166; }
 .pips { display: flex; gap: .7vh; flex: none; }
+.pipb { background: none; border: 0; padding: .5vh; border-radius: 50%; cursor: pointer; display: block; }
+.pipb:focus { outline: .5vh solid #fff; outline-offset: .1vh; }
 .pip { width: 3.6vh; height: 3.6vh; border-radius: 50%; border: .3vh solid var(--line); display: grid; place-items: center; }
 .pip.on { background: var(--c); border-color: var(--c); }
 .pip svg { width: 70%; height: 70%; fill: none; stroke: #0e1013; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
@@ -63,6 +65,7 @@ function lastTxt(who) {
 function render() {
   const root = document.getElementById('tv');
   if (!data) return;
+  const fa = document.activeElement, fk = fa && fa.dataset && fa.dataset.c ? fa.dataset.o + '|' + fa.dataset.c + '|' + fa.dataset.i : null;
   const cfg = C.sanitizeConfig(data.config || C.cloneDefault());
   const now = C.kstNow(), wk = C.mondayOf(now.ymd);
   const checks = {}; for (const k of data.checks || []) if (k.wk === wk) checks[k.chore] = k.done;
@@ -77,7 +80,7 @@ function render() {
     const rows = list.map((c) => {
       const d = Math.min(checks[c.id] || 0, c.per);
       const late = d < C.dueBy(c.per, now.dow);
-      const pips = Array.from({ length: c.per }, (_, i) => `<span class="pip${i < d ? ' on' : ''}">${i < d ? CHECK : ''}</span>`).join('');
+      const pips = Array.from({ length: c.per }, (_, i) => `<button class="pipb" data-o="${s}" data-c="${esc(c.id)}" data-i="${i + 1}" aria-label="${esc(c.name)} ${i + 1}번째"><span class="pip${i < d ? ' on' : ''}">${i < d ? CHECK : ''}</span></button>`).join('');
       return `<div class="row${d >= c.per ? ' full' : ''}${late ? ' late' : ''}"><span class="nm">${esc(c.name)}</span><span class="pips">${pips}</span></div>`;
     }).join('');
     return `<section class="card ${s.toLowerCase()}"><div class="head"><h2>${esc(cfg.names[s])}</h2><span class="prog"><b>${done}</b>/${sum}회</span></div>${lastTxt(s)}
@@ -86,18 +89,56 @@ function render() {
   root.innerHTML = `<div class="top"><h1>집안일 임무분담제</h1><span class="wk">${wlabel}</span><span class="clock" id="clock"></span></div>
     <div class="days">${days}</div><div class="cols">${person('A')}${person('B')}</div>`;
   tick();
+  let el = null;
+  if (fk) { const [o, c, i] = fk.split('|'); el = [...root.querySelectorAll('.pipb')].find((b) => b.dataset.o === o && b.dataset.c === c && b.dataset.i === i); }
+  (el || root.querySelector('.pipb'))?.focus({ preventScroll: true });
 }
 function tick() {
   const el = document.getElementById('clock'); if (!el) return;
   const k = new Date(Date.now() + 9 * 3600e3), p = (x) => String(x).padStart(2, '0');
   el.textContent = `${p(k.getUTCHours())}:${p(k.getUTCMinutes())}`;
 }
+let pending = 0, dirty = false;
 async function refresh() {
+  if (pending > 0) { dirty = true; return; }
   const { data: d, error } = await sb.rpc('hw_get', { p_key: KEY });
   document.getElementById('off').hidden = !error;
   if (error) return;
   data = d; render();
 }
+// 체크: 폰과 같은 방식(눌린 칸까지 채움 / 이미 채워진 칸이면 그 칸부터 해제). 기록은 담당자 이름으로
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('.pipb'); if (!b || !data) return;
+  const wk = C.mondayOf(C.kstNow().ymd), chore = b.dataset.c, i = +b.dataset.i;
+  const per = (C.sanitizeConfig(data.config || C.cloneDefault()).chores.find((x) => x.id === chore) || {}).per || 0;
+  let row = (data.checks || []).find((k) => k.wk === wk && k.chore === chore);
+  const cur = Math.min(row ? row.done : 0, per), next = i <= cur ? i - 1 : i;
+  if (next === cur) return;
+  if (row) row.done = next; else (data.checks ||= []).push({ wk, chore, done: next });
+  pending++; render();
+  const { error } = await sb.rpc('hw_set_check', { p_key: KEY, p_wk: wk, p_chore: chore, p_done: next, p_who: b.dataset.o });
+  pending--;
+  if (error && row) row.done = cur;
+  if (pending === 0) { dirty = false; refresh(); }
+});
+// 리모컨 방향키: 가장 가까운 칸으로 이동 (확인 버튼은 click으로 처리됨)
+document.addEventListener('keydown', (e) => {
+  const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1], 37: [-1, 0], 39: [1, 0], 38: [0, -1], 40: [0, 1] }[e.key] || { 37: [-1, 0], 39: [1, 0], 38: [0, -1], 40: [0, 1] }[e.keyCode];
+  if (!dir) return;
+  const all = [...document.querySelectorAll('.pipb')]; if (!all.length) return;
+  const cur = document.activeElement.classList && document.activeElement.classList.contains('pipb') ? document.activeElement : null;
+  if (!cur) { e.preventDefault(); all[0].focus(); return; }
+  const r = cur.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  let best = null, bs = Infinity;
+  for (const o of all) {
+    if (o === cur) continue;
+    const q = o.getBoundingClientRect(), dx = q.left + q.width / 2 - cx, dy = q.top + q.height / 2 - cy;
+    const along = dx * dir[0] + dy * dir[1], across = Math.abs(dx * dir[1]) + Math.abs(dy * dir[0]);
+    if (along <= 1) continue;
+    const sc = along + across * 3; if (sc < bs) { bs = sc; best = o; }
+  }
+  e.preventDefault(); if (best) best.focus();
+});
 async function sha(s) { return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join(''); }
 refresh();
 setInterval(refresh, 30000);      // 보조 폴링
