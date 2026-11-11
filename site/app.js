@@ -153,7 +153,7 @@ function mainScreen() {
       <span class="prog"><b>${done}</b>/${sumPer}회 · ${C.fmtMin(doneMin)}</span></div><div class="meter"><i style="width:${sumPer ? (done / sumPer) * 100 : 0}%"></i></div>${rows || '<div class="empty">이번 주 담당이 없어요</div>'}</section>`;
   };
   const order = S.who === 'B' ? ['B', 'A'] : ['A', 'B'];
-  return `<div class="wrap"><header class="top"><button class="iconbtn" data-act="prev" aria-label="이전 주">‹</button>
+  return `<div class="wrap"><header class="top"><span style="width:44px;flex:none" aria-hidden="true"></span><button class="iconbtn" data-act="prev" aria-label="이전 주">‹</button>
     <div class="nav"><div class="weektitle"><b>${n}주차${isNow ? '<span class="pill now">이번 주</span>' : ''}${S.online ? '' : '<span class="pill off">오프라인</span>'}</b><small>${md(wk)} – ${md(C.addDays(wk, 6))}</small></div></div>
     <button class="iconbtn" data-act="next" aria-label="다음 주">›</button><button class="iconbtn" data-act="settings" aria-label="설정">⚙︎</button></header>
     ${isNow ? '' : '<div class="today"><button data-act="today">이번 주로 돌아가기</button></div>'}
