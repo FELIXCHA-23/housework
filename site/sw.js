@@ -1,4 +1,4 @@
-const CACHE = 'hw-v2';
+const CACHE = 'hw-v3';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'core.js', 'config.js', 'vendor/supabase.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

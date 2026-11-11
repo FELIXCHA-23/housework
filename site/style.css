@@ -114,3 +114,6 @@ input:focus, select:focus { border-color: var(--a); }
 #toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px); background: #1a1d24; color: #fff; padding: 10px 16px; border-radius: 99px; font-size: 14px; opacity: 0; pointer-events: none; transition: .2s; max-width: 90vw; z-index: 20; }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 .chore .meta { margin-left: auto; }
+
+/* 더블탭 확대 방지 */
+*, *::before, *::after { touch-action: manipulation; }
