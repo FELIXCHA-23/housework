@@ -166,7 +166,8 @@ function mainScreen() {
     const doneMin = list.reduce((a, c) => a + Math.min(checks[c.id] || 0, c.per) * c.min, 0);
     const rows = list.map((c) => {
       const d = Math.min(checks[c.id] || 0, c.per);
-      const pip = (i) => `<button class="pipbtn${c.per === 1 ? ' solo' : ''}" data-act="pip" data-c="${esc(c.id)}" data-i="${i}" aria-pressed="${i <= d}" aria-label="${esc(c.name)} ${i}번째"><span class="pip${i <= d ? ' on' : ''}${i <= d && S.fresh.has(c.id + ':' + i) ? ' draw' : ''}">${i <= d ? CHECK_SVG : ''}</span></button>`;
+      const mine = S.who === s; // 본인 담당만 체크·해제 가능
+      const pip = (i) => `<button class="pipbtn${c.per === 1 ? ' solo' : ''}${mine ? '' : ' ro'}"${mine ? '' : ' disabled'} data-act="pip" data-o="${s}" data-c="${esc(c.id)}" data-i="${i}" aria-pressed="${i <= d}" aria-label="${esc(c.name)} ${i}번째"><span class="pip${i <= d ? ' on' : ''}${i <= d && S.fresh.has(c.id + ':' + i) ? ' draw' : ''}">${i <= d ? CHECK_SVG : ''}</span></button>`;
       const pips = Array.from({ length: c.per }, (_, i) => pip(i + 1)).join('');
       return `<div class="chore${d >= c.per ? ' full' : ''}"><div class="row"><span class="nm">${esc(c.name)}</span><span class="meta">${c.min}분 × ${c.per}${c.per === 1 ? '' : ` · ${d}/${c.per}`}</span>${c.per === 1 ? pips : ''}</div>${c.per > 1 ? `<div class="pips">${pips}</div>` : ''}</div>`;
     }).join('');
@@ -235,6 +236,7 @@ document.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act;
   if (a === 'pip') {
+    if (el.dataset.o !== S.who) return toast('상대방 항목은 체크할 수 없어요');
     const c = S.cfg.chores.find((x) => x.id === el.dataset.c); const i = +el.dataset.i; const cur = Math.min((S.checks[S.wk] || {})[c.id] || 0, c.per);
     return setCheck(c, i <= cur ? i - 1 : i);
   }

@@ -157,3 +157,5 @@ input:focus, select:focus { border-color: var(--a); }
   *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; }
   .spin { animation: spin 1.2s linear infinite !important; }
 }
+
+.pipbtn.ro { cursor: default; pointer-events: none; }
