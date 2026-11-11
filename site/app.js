@@ -42,7 +42,7 @@ function onError(e) {
 
 function applyServer(data) {
   S.cfg = data.config ? C.sanitizeConfig(data.config) : C.cloneDefault();
-  S.checks = {};
+  S.checks = {}; S.last = data.last || {};
   for (const k of data.checks || []) (S.checks[k.wk] ||= {})[k.chore] = k.done;
 }
 async function refresh() {
@@ -53,6 +53,16 @@ async function refresh() {
   S.online = true; S.keyError = false;
   applyServer(data); ls.set('hw_cache', JSON.stringify(data));
   if (S.view !== 'settings') render(); else renderPartialOnline();
+}
+// 사람별 마지막 체크 시각 (KST)
+function lastTxt(s) {
+  const t = S.last && S.last[s]; if (!t) return '';
+  const f = (o, d = new Date(t)) => new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', ...o }).format(d);
+  const ymd = { year: 'numeric', month: '2-digit', day: '2-digit' };
+  const day = f(ymd), today = f(ymd, new Date());
+  const hm = f({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const md = f({ month: 'numeric', day: 'numeric' });
+  return `<div class="last">마지막 체크 ${day === today ? '오늘' : md} ${hm}</div>`;
 }
 function renderPartialOnline() { /* 설정 편집 중엔 화면을 다시 그리지 않음 */ }
 
@@ -149,7 +159,7 @@ function mainScreen() {
       const pips = Array.from({ length: c.per }, (_, i) => pip(i + 1)).join('');
       return `<div class="chore${d >= c.per ? ' full' : ''}"><div class="row"><span class="nm">${esc(c.name)}</span><span class="meta">${c.min}분 × ${c.per}${c.per === 1 ? '' : ` · ${d}/${c.per}`}</span>${c.per === 1 ? pips : ''}</div>${c.per > 1 ? `<div class="pips">${pips}</div>` : ''}</div>`;
     }).join('');
-    return `<section class="card person ${s.toLowerCase()}"><div class="head"><h2><span class="dot"></span>${esc(nm(s))}${S.who === s ? '<span class="me">나</span>' : ''}</h2>
+    return `<section class="card person ${s.toLowerCase()}"><div class="head"><div><h2><span class="dot"></span>${esc(nm(s))}${S.who === s ? '<span class="me">나</span>' : ''}</h2>${lastTxt(s)}</div>
       <span class="prog"><b>${done}</b>/${sumPer}회 · ${C.fmtMin(doneMin)}</span></div><div class="meter"><i style="width:${sumPer ? (done / sumPer) * 100 : 0}%"></i></div>${rows || '<div class="empty">이번 주 담당이 없어요</div>'}</section>`;
   };
   const order = S.who === 'B' ? ['B', 'A'] : ['A', 'B'];

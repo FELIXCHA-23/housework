@@ -27,6 +27,23 @@ create table if not exists public.hw_devices (
   sub jsonb not null,
   created_at timestamptz not null default now()
 );
+-- 체크 알림 대기열: 첫 체크 후 1분 동안 수정 가능, 1분 뒤에도 늘어난 상태면 발송
+create table if not exists public.hw_pending (
+  wk date not null,
+  chore text not null,
+  who text not null check (who in ('A','B')),
+  base int not null,           -- 첫 체크 직전 횟수
+  first_at timestamptz not null default now(),
+  primary key (wk, chore, who)
+);
+-- 사람별 마지막 체크 시각
+create table if not exists public.hw_last (
+  who text primary key check (who in ('A','B')),
+  at timestamptz not null
+);
+alter table public.hw_pending enable row level security;
+alter table public.hw_last enable row level security;
+revoke all on public.hw_pending, public.hw_last from anon, authenticated;
 
 -- 테이블은 API(anon)로 직접 못 읽게: RLS 켜고 정책 없음 + 권한 회수. 접근은 아래 RPC(키 검사)만.
 alter table public.hw_secret enable row level security;
@@ -83,6 +100,7 @@ begin
   return jsonb_build_object(
     'config', (select data from public.hw_config where id = 1),
     'checks', coalesce((select jsonb_agg(jsonb_build_object('wk', wk, 'chore', chore, 'done', done)) from public.hw_checks where done > 0), '[]'::jsonb),
+    'last', coalesce((select jsonb_object_agg(who, at) from public.hw_last), '{}'::jsonb),
     'now', now());
 end $$;
 
@@ -104,8 +122,23 @@ begin
   insert into public.hw_checks(wk, chore, done) values (p_wk, p_chore, greatest(p_done, 0))
   on conflict (wk, chore) do update set done = excluded.done, updated_at = now();
   if p_done > prev and p_who in ('A','B') then
-    perform public.hw_call_fn(jsonb_build_object('type', 'check', 'wk', p_wk, 'chore', p_chore, 'done', p_done, 'who', p_who));
+    insert into public.hw_last(who, at) values (p_who, now()) on conflict (who) do update set at = excluded.at;
+    -- 바로 보내지 않고 대기열에(이미 있으면 첫 체크 시각·기준값 유지). hw_flush가 1분 뒤 발송
+    insert into public.hw_pending(wk, chore, who, base) values (p_wk, p_chore, p_who, prev) on conflict do nothing;
   end if;
+end $$;
+
+-- 첫 체크 후 1분 지난 대기 건 처리: 그때도 기준보다 늘어 있으면 알림, 취소됐으면 조용히 삭제
+create or replace function public.hw_flush() returns void
+language plpgsql security definer set search_path = '' as $$
+declare r record; cur int;
+begin
+  for r in delete from public.hw_pending where first_at <= now() - interval '1 minute' returning * loop
+    select done into cur from public.hw_checks where wk = r.wk and chore = r.chore;
+    if coalesce(cur, 0) > r.base then
+      perform public.hw_call_fn(jsonb_build_object('type', 'check', 'wk', r.wk, 'chore', r.chore, 'done', cur, 'who', r.who));
+    end if;
+  end loop;
 end $$;
 
 create or replace function public.hw_reset(p_key text, p_data jsonb) returns void
@@ -113,6 +146,8 @@ language plpgsql security definer set search_path = '' as $$
 begin
   perform public.hw_auth(p_key);
   delete from public.hw_checks where true;
+  delete from public.hw_pending where true;
+  delete from public.hw_last where true;
   insert into public.hw_config(id, data) values (1, p_data)
   on conflict (id) do update set data = excluded.data, updated_at = now();
 end $$;
@@ -147,13 +182,14 @@ begin
 end $$;
 
 -- 함수 실행 권한: 내부용은 막고, 앱용 RPC만 anon에 허용
-revoke all on function public.hw_auth(text), public.hw_ping(), public.hw_call_fn(jsonb), public.hw_cron(text) from public, anon, authenticated;
+revoke all on function public.hw_auth(text), public.hw_ping(), public.hw_call_fn(jsonb), public.hw_cron(text), public.hw_flush() from public, anon, authenticated;
 revoke all on function public.hw_get(text), public.hw_save_config(text, jsonb), public.hw_set_check(text, date, text, int, text),
   public.hw_reset(text, jsonb), public.hw_subscribe(text, text, jsonb), public.hw_unsubscribe(text, text), public.hw_test(text, text) from public;
 grant execute on function public.hw_get(text), public.hw_save_config(text, jsonb), public.hw_set_check(text, date, text, int, text),
   public.hw_reset(text, jsonb), public.hw_subscribe(text, text, jsonb), public.hw_unsubscribe(text, text), public.hw_test(text, text) to anon, authenticated;
 
 -- 정기 알림 (pg_cron은 UTC): 월 09:00 KST = 월 00:00 UTC, 매일 20:00 KST = 11:00 UTC
-select cron.unschedule(jobname) from cron.job where jobname in ('hw_weekly', 'hw_daily');
+select cron.unschedule(jobname) from cron.job where jobname in ('hw_weekly', 'hw_daily', 'hw_flush');
+select cron.schedule('hw_flush', '10 seconds', $$select public.hw_flush()$$);
 select cron.schedule('hw_weekly', '0 0 * * 1', $$select public.hw_cron('weekly')$$);
 select cron.schedule('hw_daily', '0 11 * * *', $$select public.hw_cron('daily')$$);
