@@ -1,5 +1,5 @@
-const CACHE = 'hw-v9';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'core.js', 'config.js', 'vendor/supabase.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
+const CACHE = 'hw-v10';
+const SHELL = ['./', 'index.html', 'tv.html', 'style.css', 'app.js', 'core.js', 'config.js', 'vendor/supabase.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
