@@ -162,9 +162,15 @@ function mainScreen() {
       <span class="prog"><b>${done}</b>/${sumPer}회 · ${C.fmtMin(doneMin)}</span></div><div class="meter"><i style="width:${sumPer ? (done / sumPer) * 100 : 0}%"></i></div>${rows || '<div class="empty">이번 주 담당이 없어요</div>'}</section>`;
   };
   const order = S.who === 'B' ? ['B', 'A'] : ['A', 'B'];
-  return `<div class="wrap"><header class="top"><span style="width:44px;flex:none" aria-hidden="true"></span><button class="iconbtn" data-act="prev" aria-label="이전 주">‹</button>
-    <div class="nav"><div class="weektitle"><b>${n}주차${isNow ? '<span class="pill now">이번 주</span>' : ''}${S.online ? '' : '<span class="pill off">오프라인</span>'}</b><small>${md(wk)} – ${md(C.addDays(wk, 6))}</small></div></div>
+  const [, wm, wd] = wk.split('-').map(Number);
+  const wlabel = `${wm}월 ${['첫째', '둘째', '셋째', '넷째', '다섯째'][Math.ceil(wd / 7) - 1]}주`;
+  const todayYmd = C.kstNow().ymd;
+  const days = '월화수목금토일'.split('').map((w, i) => { const y = C.addDays(wk, i);
+    return `<div class="day${y === todayYmd ? ' today' : ''}"><span class="dw">${w}</span><span class="dn">${Number(y.slice(8))}</span></div>`; }).join('');
+  return `<div class="wrap"><div class="apptitle">집안일 임무분담제</div><header class="top"><span style="width:44px;flex:none" aria-hidden="true"></span><button class="iconbtn" data-act="prev" aria-label="이전 주">‹</button>
+    <div class="nav"><div class="weektitle"><b>${wlabel}${S.online ? '' : '<span class="pill off">오프라인</span>'}</b></div></div>
     <button class="iconbtn" data-act="next" aria-label="다음 주">›</button><button class="iconbtn" data-act="settings" aria-label="설정">⚙︎</button></header>
+    <div class="days">${days}</div>
     ${isNow ? '' : '<div class="today"><button data-act="today">이번 주로 돌아가기</button></div>'}
     <section class="card sum"><div class="names"><div class="who"><span class="nm">${esc(nm('A'))}</span><span class="mn a">${load.A}<small>분</small></span></div>
       <div class="who"><span class="nm">${esc(nm('B'))}</span><span class="mn b">${load.B}<small>분</small></span></div></div>
