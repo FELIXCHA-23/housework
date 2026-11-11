@@ -1,0 +1,18 @@
+{
+  "name": "housework",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
+    "deno": "^2.9.6",
+    "playwright-core": "^1.65.0",
+    "web-push": "^3.6.7"
+  }
+}
