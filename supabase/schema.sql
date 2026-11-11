@@ -34,6 +34,9 @@ alter table public.hw_config enable row level security;
 alter table public.hw_checks enable row level security;
 alter table public.hw_devices enable row level security;
 revoke all on public.hw_secret, public.hw_config, public.hw_checks, public.hw_devices from anon, authenticated;
+-- push 함수(service_role)용. 새 테이블 기본 권한이 없는 프로젝트 대비
+grant select on public.hw_config, public.hw_checks to service_role;
+grant select, delete on public.hw_devices to service_role;
 
 create or replace function public.hw_auth(p_key text) returns void
 language plpgsql security definer set search_path = '' as $$
