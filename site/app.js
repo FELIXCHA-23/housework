@@ -192,7 +192,7 @@ function mainScreen() {
 }
 
 // ───────── 설정(편집)
-function openSettings() { S.draft = JSON.parse(JSON.stringify(S.cfg)); S.view = 'settings'; S.armed = false; getPush().then((p) => { S.push = p; if (S.view === 'settings') renderSettings(); }); renderSettings(); window.scrollTo(0, 0); $('#app > .wrap').classList.add('sheet-in'); }
+function openSettings() { S.draft = JSON.parse(JSON.stringify(S.cfg)); S.view = 'settings'; S.armed = false; getPush().then((p) => { S.push = p; if (S.view === 'settings') renderSettings(); }); S.sheetIn = true; setTimeout(() => { S.sheetIn = false; }, 400); renderSettings(); window.scrollTo(0, 0); }
 function renderSettings() {
   const d = S.draft, p = S.push, theme = ls.get('hw_theme') || 'auto';
   let pushHtml;
@@ -212,7 +212,7 @@ function renderSettings() {
     <div class="field"><label>주당 횟수</label><input type="number" inputmode="numeric" min="1" max="14" data-f="per" value="${c.per}"></div>
     <div class="field"><label>기본 담당</label><select data-f="base"><option value="A"${c.base === 'A' ? ' selected' : ''}>${esc(d.names.A)} (A)</option><option value="B"${c.base === 'B' ? ' selected' : ''}>${esc(d.names.B)} (B)</option></select></div></div></div>`).join('');
   const dl = C.weekLoad(d, S.wk);
-  $('#app').innerHTML = `<div class="wrap"><header class="top"><button class="iconbtn" data-act="back" aria-label="뒤로">‹</button><div class="nav"><div class="weektitle"><b>설정</b></div></div><span style="width:44px"></span></header>
+  $('#app').innerHTML = `<div class="wrap${S.sheetIn ? ' sheet-in' : ''}"><header class="top"><button class="iconbtn" data-act="back" aria-label="뒤로">‹</button><div class="nav"><div class="weektitle"><b>설정</b></div></div><span style="width:44px"></span></header>
   <h3>알림</h3><section class="card">${pushHtml}</section>
   <h3>내 정보</h3><section class="card"><div class="row2" style="align-items:center;justify-content:space-between"><span>이 기기: <b>${esc(nm(S.who))}</b></span><button class="btn sm" data-act="chwho">바꾸기</button></div></section>
   <h3>화면</h3><section class="card"><div class="seg" role="group" aria-label="화면 모드">${[['auto', '자동'], ['light', '라이트'], ['dark', '다크']].map(([v, l]) => `<button data-act="theme" data-v="${v}" class="${theme === v ? 'on' : ''}">${l}</button>`).join('')}</div></section>
