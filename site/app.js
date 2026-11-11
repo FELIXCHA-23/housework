@@ -57,12 +57,11 @@ async function refresh() {
 // 사람별 마지막 체크 시각 (KST)
 function lastTxt(s) {
   const t = S.last && S.last[s]; if (!t) return '';
-  const f = (o, d = new Date(t)) => new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', ...o }).format(d);
-  const ymd = { year: 'numeric', month: '2-digit', day: '2-digit' };
-  const day = f(ymd), today = f(ymd, new Date());
-  const hm = f({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-  const md = f({ month: 'numeric', day: 'numeric' });
-  return `<div class="last">마지막 체크 ${day === today ? '오늘' : md} ${hm}</div>`;
+  const k = (ms) => new Date(ms + 9 * 3600e3); // KST를 UTC 필드로
+  const d = k(Date.parse(t)), n = k(Date.now()), p2 = (x) => String(x).padStart(2, '0');
+  const same = d.toISOString().slice(0, 10) === n.toISOString().slice(0, 10);
+  const day = same ? '오늘' : `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+  return `<div class="last">마지막 체크 ${day} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}</div>`;
 }
 function renderPartialOnline() { /* 설정 편집 중엔 화면을 다시 그리지 않음 */ }
 
