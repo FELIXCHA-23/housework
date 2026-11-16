@@ -208,18 +208,22 @@ function renderSettings() {
   } else {
     pushHtml = `<div class="status"><i></i>알림 꺼짐</div><button class="btn primary" data-act="pushon" ${S.busy ? 'disabled' : ''}>${S.busy ? SPIN : ''}알림 켜기</button><p class="note">체크 알림, 월요일 09:00 이번 주 담당, 매일 20:00 남은 일을 받아요.</p>`;
   }
-  const chores = d.chores.map((c, i) => `<div class="erow" data-i="${i}"><div class="l"><input type="text" data-f="name" value="${esc(c.name)}" aria-label="집안일 이름" maxlength="40"><button class="iconbtn" data-act="del" data-i="${i}" aria-label="삭제">🗑</button></div>
-    <div class="grid3"><div class="field"><label>1회 분</label><input type="number" inputmode="numeric" min="0" max="999" data-f="min" value="${c.min}"></div>
-    <div class="field"><label>주당 횟수</label><input type="number" inputmode="numeric" min="1" max="14" data-f="per" value="${c.per}"></div>
-    <div class="field"><label>기본 담당</label><select data-f="base"><option value="A"${c.base === 'A' ? ' selected' : ''}>${esc(d.names.A)} (A)</option><option value="B"${c.base === 'B' ? ' selected' : ''}>${esc(d.names.B)} (B)</option></select></div></div></div>`).join('');
-  const dl = C.weekLoad(d, S.wk);
-  $('#app').innerHTML = `<div class="wrap${S.sheetIn ? ' sheet-in' : ''}"><header class="top"><button class="iconbtn" data-act="back" aria-label="뒤로">‹</button><div class="nav"><div class="weektitle"><b>설정</b></div></div><span style="width:44px"></span></header>
+  // 담당별로 왼쪽(A)·오른쪽(B) 두 칸에 모아서 보여줌 (기본 담당 기준, 짝수 주엔 서로 바뀜)
+  const erow = (c, i) => { const to = c.base === 'A' ? 'B' : 'A'; return `<div class="erow" data-i="${i}"><input type="text" data-f="name" value="${esc(c.name)}" aria-label="집안일 이름" maxlength="40">
+    <div class="grid2"><div class="field"><label>1회(분)</label><input type="number" inputmode="numeric" min="0" max="999" data-f="min" value="${c.min}"></div>
+    <div class="field"><label>주당 횟수</label><input type="number" inputmode="numeric" min="1" max="14" data-f="per" value="${c.per}"></div></div>
+    <div class="row2"><button class="btn sm swap" data-act="swap" data-i="${i}">${to === 'B' ? '→' : '←'} ${esc(d.names[to])}</button><button class="iconbtn" data-act="del" data-i="${i}" aria-label="삭제">🗑</button></div></div>`; };
+  const col = (w) => { const list = d.chores.map((c, i) => [c, i]).filter(([c]) => c.base === w);
+    const mins = list.reduce((a, [c]) => a + (Number(c.min) || 0) * (Number(c.per) || 0), 0);
+    return `<div class="setcol ${w.toLowerCase()}"><div class="colhead"><b>${esc(d.names[w])}</b><span>${list.length}개 · ${mins}분</span></div>${list.map(([c, i]) => erow(c, i)).join('') || '<div class="empty">없음</div>'}<button class="btn" data-act="add" data-b="${w}">+ 추가</button></div>`; };
+  const chores = `<div class="cols2">${col('A')}${col('B')}</div>`;
+    $('#app').innerHTML = `<div class="wrap${S.sheetIn ? ' sheet-in' : ''}"><header class="top"><button class="iconbtn" data-act="back" aria-label="뒤로">‹</button><div class="nav"><div class="weektitle"><b>설정</b></div></div><span style="width:44px"></span></header>
   <h3>알림</h3><section class="card">${pushHtml}</section>
   <h3>내 정보</h3><section class="card"><div class="row2" style="align-items:center;justify-content:space-between"><span>이 기기: <b>${esc(nm(S.who))}</b></span><button class="btn sm" data-act="chwho">바꾸기</button></div></section>
   <h3>화면</h3><section class="card"><div class="seg" role="group" aria-label="화면 모드">${[['auto', '자동'], ['light', '라이트'], ['dark', '다크']].map(([v, l]) => `<button data-act="theme" data-v="${v}" class="${theme === v ? 'on' : ''}">${l}</button>`).join('')}</div></section>
   <h3>이름</h3><section class="card"><div class="grid3" style="grid-template-columns:1fr 1fr"><div class="field"><label>A</label><input type="text" data-n="A" value="${esc(d.names.A)}" maxlength="12"></div><div class="field"><label>B</label><input type="text" data-n="B" value="${esc(d.names.B)}" maxlength="12"></div></div></section>
-  <h3>집안일 (${d.chores.length}개 · 홀수 주 기준 ${dl.A} / ${dl.B}분)</h3><section class="card">${chores || '<div class="empty">집안일이 없어요</div>'}<button class="btn" data-act="add" style="margin-top:8px">+ 집안일 추가</button>
-  <p class="note">홀수 주는 "기본 담당" 그대로, 짝수 주는 A↔B가 바뀌어요.</p></section>
+  <h3>담당 (총 ${d.chores.length}개)</h3><section class="card setcard">${chores}
+  <p class="note">여기 보이는 건 홀수 주 담당이에요. 짝수 주는 왼쪽·오른쪽이 서로 바뀌어요. →/← 버튼으로 담당을 옮길 수 있어요.</p></section>
   <h3>주차</h3><section class="card"><p class="note" style="margin:0 0 10px">지금 기준 1주차 시작: <b>${md(d.anchor)}</b> (${d.anchor.slice(0, 4)})</p><button class="btn" data-act="restart">이번 주를 1주차로 다시 시작</button></section>
   <h3>초기화</h3><section class="card"><button class="btn danger${S.armed ? ' armed' : ''}" data-act="reset">${S.armed ? '정말 전부 초기화 — 한 번 더 누르세요' : '전체 초기화'}</button><p class="note">모든 체크 기록을 지우고 집안일·이름을 처음 값으로 되돌려요.</p></section>
   <div class="savebar"><button class="btn" data-act="back">취소</button><button class="btn primary" data-act="save">저장</button></div></div>`;
@@ -251,7 +255,8 @@ document.addEventListener('click', async (e) => {
   if (a === 'pushon') return enablePush();
   if (a === 'pushoff') return disablePush();
   if (a === 'test') return testPush();
-  if (a === 'add') { S.draft.chores.push({ id: 'c' + Math.random().toString(36).slice(2, 8), name: '새 집안일', min: 10, per: 1, base: 'A' }); renderSettings(); const r = [...document.querySelectorAll('.erow')].pop(); r?.scrollIntoView({ block: 'center' }); return r?.querySelector('input')?.select(); }
+  if (a === 'swap') { const c = S.draft.chores[+el.dataset.i]; c.base = c.base === 'A' ? 'B' : 'A'; return renderSettings(); }
+  if (a === 'add') { S.draft.chores.push({ id: 'c' + Math.random().toString(36).slice(2, 8), name: '새 집안일', min: 10, per: 1, base: el.dataset.b === 'B' ? 'B' : 'A' }); renderSettings(); const r = document.querySelector(`.erow[data-i="${S.draft.chores.length - 1}"]`); r?.scrollIntoView({ block: 'center' }); return r?.querySelector('input')?.select(); }
   if (a === 'del') { S.draft.chores.splice(+el.dataset.i, 1); return renderSettings(); }
   if (a === 'restart') { S.draft.anchor = C.mondayOf(C.kstNow().ymd); S.wk = S.draft.anchor; return saveCfg(S.draft, '이번 주가 1주차가 됐어요'); }
   if (a === 'save') return saveCfg(S.draft);
