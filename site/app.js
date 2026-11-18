@@ -62,6 +62,10 @@ async function refresh() {
   if (error) return onError(error);
   S.online = true; S.keyError = false;
   applyServer(data); ls.set('hw_cache', JSON.stringify(data));
+  if (!S.cfg.m73 && data.config) { // 일회성: 주 7회 항목을 주 3회로
+    const next = { ...S.cfg, m73: true, chores: S.cfg.chores.map((c) => (c.per === 7 ? { ...c, per: 3 } : c)) };
+    const r = await rpc('hw_save_config', { p_data: next }); if (!r.error) S.cfg = C.sanitizeConfig(next);
+  }
   if (S.view !== 'settings') render(); else renderPartialOnline();
 }
 // 사람별 마지막 체크 시각 (KST)
@@ -193,7 +197,7 @@ function mainScreen() {
 }
 
 // ───────── 설정(편집)
-function openSettings() { S.draft = JSON.parse(JSON.stringify(S.cfg)); S.view = 'settings'; S.armed = false; getPush().then((p) => { S.push = p; if (S.view === 'settings') renderSettings(); }); S.sheetIn = true; setTimeout(() => { S.sheetIn = false; }, 400); renderSettings(); window.scrollTo(0, 0); }
+function openSettings() { S.openRow = null; S.draft = JSON.parse(JSON.stringify(S.cfg)); S.view = 'settings'; S.armed = false; getPush().then((p) => { S.push = p; if (S.view === 'settings') renderSettings(); }); S.sheetIn = true; setTimeout(() => { S.sheetIn = false; }, 400); renderSettings(); window.scrollTo(0, 0); }
 function renderSettings() {
   const d = S.draft, p = S.push, theme = ls.get('hw_theme') || 'auto';
   let pushHtml;
@@ -208,22 +212,28 @@ function renderSettings() {
   } else {
     pushHtml = `<div class="status"><i></i>알림 꺼짐</div><button class="btn primary" data-act="pushon" ${S.busy ? 'disabled' : ''}>${S.busy ? SPIN : ''}알림 켜기</button><p class="note">체크 알림, 월요일 09:00 이번 주 담당, 매일 20:00 남은 일을 받아요.</p>`;
   }
-  // 담당별로 왼쪽(A)·오른쪽(B) 두 칸에 모아서 보여줌 (기본 담당 기준, 짝수 주엔 서로 바뀜)
-  const erow = (c, i) => { const to = c.base === 'A' ? 'B' : 'A'; return `<div class="erow" data-i="${i}"><input type="text" data-f="name" value="${esc(c.name)}" aria-label="집안일 이름" maxlength="40">
-    <div class="grid2"><div class="field"><label>1회(분)</label><input type="number" inputmode="numeric" min="0" max="999" data-f="min" value="${c.min}"></div>
-    <div class="field"><label>주당 횟수</label><input type="number" inputmode="numeric" min="1" max="14" data-f="per" value="${c.per}"></div></div>
-    <div class="row2"><button class="btn sm swap" data-act="swap" data-i="${i}">${to === 'B' ? '→' : '←'} ${esc(d.names[to])}</button><button class="iconbtn" data-act="del" data-i="${i}" aria-label="삭제">🗑</button></div></div>`; };
-  const col = (w) => { const list = d.chores.map((c, i) => [c, i]).filter(([c]) => c.base === w);
+  // 한 줄 목록: 이름 · 1회 분 · 주당 횟수가 한눈에. 줄을 누르면 그 자리에서 편집.
+  const stepper = (i, f, v, unit, step, min, max) => `<div class="stp"><button class="sbtn" data-act="step" data-i="${i}" data-f="${f}" data-d="${-step}" data-min="${min}" data-max="${max}" aria-label="빼기">−</button><input type="number" inputmode="numeric" data-f="${f}" value="${v}" min="${min}" max="${max}"><span class="unit">${unit}</span><button class="sbtn" data-act="step" data-i="${i}" data-f="${f}" data-d="${step}" data-min="${min}" data-max="${max}" aria-label="더하기">+</button></div>`;
+  const erow = (c, i) => {
+    const open = S.openRow === i, to = c.base === 'A' ? 'B' : 'A';
+    const line = `<button class="li" data-act="row" data-i="${i}" aria-expanded="${open}"><span class="lnm">${esc(c.name)}</span><span class="lmeta"><b>${Number(c.min) || 0}</b>분 · 주 <b>${Number(c.per) || 0}</b>회</span><span class="lmin">${(Number(c.min) || 0) * (Number(c.per) || 0)}분</span></button>`;
+    if (!open) return `<div class="erow" data-i="${i}">${line}</div>`;
+    return `<div class="erow open" data-i="${i}">${line}<div class="edit"><input type="text" data-f="name" value="${esc(c.name)}" aria-label="집안일 이름" maxlength="40">
+      <div class="editgrid"><label>1회</label>${stepper(i, 'min', c.min, '분', 5, 0, 999)}<label>주당</label>${stepper(i, 'per', c.per, '회', 1, 1, 14)}</div>
+      <div class="row2"><button class="btn sm" data-act="swap" data-i="${i}">→ ${esc(d.names[to])}</button><button class="btn sm danger" data-act="del" data-i="${i}">삭제</button><button class="btn sm" data-act="row" data-i="${i}">접기</button></div></div></div>`;
+  };
+  const group = (w) => { const list = d.chores.map((c, i) => [c, i]).filter(([c]) => c.base === w);
     const mins = list.reduce((a, [c]) => a + (Number(c.min) || 0) * (Number(c.per) || 0), 0);
-    return `<div class="setcol ${w.toLowerCase()}"><div class="colhead"><b>${esc(d.names[w])}</b><span>${list.length}개 · ${mins}분</span></div>${list.map(([c, i]) => erow(c, i)).join('') || '<div class="empty">없음</div>'}<button class="btn" data-act="add" data-b="${w}">+ 추가</button></div>`; };
-  const chores = `<div class="cols2">${col('A')}${col('B')}</div>`;
+    return `<div class="grp ${w.toLowerCase()}"><div class="grphead"><b>${esc(d.names[w])}</b><span>${list.length}개 · 주 ${C.fmtMin(mins)}</span></div>
+      <div class="lst">${list.map(([c, i]) => erow(c, i)).join('') || '<div class="empty">없음</div>'}</div><button class="btn sm addbtn" data-act="add" data-b="${w}">+ ${esc(d.names[w])} 집안일 추가</button></div>`; };
+  const chores = group('A') + group('B');
     $('#app').innerHTML = `<div class="wrap${S.sheetIn ? ' sheet-in' : ''}"><header class="top"><button class="iconbtn" data-act="back" aria-label="뒤로">‹</button><div class="nav"><div class="weektitle"><b>설정</b></div></div><span style="width:44px"></span></header>
   <h3>알림</h3><section class="card">${pushHtml}</section>
   <h3>내 정보</h3><section class="card"><div class="row2" style="align-items:center;justify-content:space-between"><span>이 기기: <b>${esc(nm(S.who))}</b></span><button class="btn sm" data-act="chwho">바꾸기</button></div></section>
   <h3>화면</h3><section class="card"><div class="seg" role="group" aria-label="화면 모드">${[['auto', '자동'], ['light', '라이트'], ['dark', '다크']].map(([v, l]) => `<button data-act="theme" data-v="${v}" class="${theme === v ? 'on' : ''}">${l}</button>`).join('')}</div></section>
   <h3>이름</h3><section class="card"><div class="grid3" style="grid-template-columns:1fr 1fr"><div class="field"><label>A</label><input type="text" data-n="A" value="${esc(d.names.A)}" maxlength="12"></div><div class="field"><label>B</label><input type="text" data-n="B" value="${esc(d.names.B)}" maxlength="12"></div></div></section>
   <h3>담당 (총 ${d.chores.length}개)</h3><section class="card setcard">${chores}
-  <p class="note">여기 보이는 건 홀수 주 담당이에요. 짝수 주는 왼쪽·오른쪽이 서로 바뀌어요. →/← 버튼으로 담당을 옮길 수 있어요.</p></section>
+  <p class="note">홀수 주 담당 기준이에요. 짝수 주엔 서로 바뀌어요. 줄을 누르면 고칠 수 있어요.</p></section>
   <h3>주차</h3><section class="card"><p class="note" style="margin:0 0 10px">지금 기준 1주차 시작: <b>${md(d.anchor)}</b> (${d.anchor.slice(0, 4)})</p><button class="btn" data-act="restart">이번 주를 1주차로 다시 시작</button></section>
   <h3>초기화</h3><section class="card"><button class="btn danger${S.armed ? ' armed' : ''}" data-act="reset">${S.armed ? '정말 전부 초기화 — 한 번 더 누르세요' : '전체 초기화'}</button><p class="note">모든 체크 기록을 지우고 집안일·이름을 처음 값으로 되돌려요.</p></section>
   <div class="savebar"><button class="btn" data-act="back">취소</button><button class="btn primary" data-act="save">저장</button></div></div>`;
@@ -255,9 +265,11 @@ document.addEventListener('click', async (e) => {
   if (a === 'pushon') return enablePush();
   if (a === 'pushoff') return disablePush();
   if (a === 'test') return testPush();
+  if (a === 'row') { const i = +el.dataset.i; S.openRow = S.openRow === i ? null : i; renderSettings(); return document.querySelector(`.erow[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' }); }
+  if (a === 'step') { const c = S.draft.chores[+el.dataset.i], f = el.dataset.f; c[f] = Math.min(+el.dataset.max, Math.max(+el.dataset.min, (Number(c[f]) || 0) + +el.dataset.d)); return renderSettings(); }
   if (a === 'swap') { const c = S.draft.chores[+el.dataset.i]; c.base = c.base === 'A' ? 'B' : 'A'; return renderSettings(); }
-  if (a === 'add') { S.draft.chores.push({ id: 'c' + Math.random().toString(36).slice(2, 8), name: '새 집안일', min: 10, per: 1, base: el.dataset.b === 'B' ? 'B' : 'A' }); renderSettings(); const r = document.querySelector(`.erow[data-i="${S.draft.chores.length - 1}"]`); r?.scrollIntoView({ block: 'center' }); return r?.querySelector('input')?.select(); }
-  if (a === 'del') { S.draft.chores.splice(+el.dataset.i, 1); return renderSettings(); }
+  if (a === 'add') { S.draft.chores.push({ id: 'c' + Math.random().toString(36).slice(2, 8), name: '새 집안일', min: 10, per: 1, base: el.dataset.b === 'B' ? 'B' : 'A' }); S.openRow = S.draft.chores.length - 1; renderSettings(); const r = document.querySelector(`.erow[data-i="${S.draft.chores.length - 1}"]`); r?.scrollIntoView({ block: 'center' }); return r?.querySelector('input')?.select(); }
+  if (a === 'del') { S.draft.chores.splice(+el.dataset.i, 1); S.openRow = null; return renderSettings(); }
   if (a === 'restart') { S.draft.anchor = C.mondayOf(C.kstNow().ymd); S.wk = S.draft.anchor; return saveCfg(S.draft, '이번 주가 1주차가 됐어요'); }
   if (a === 'save') return saveCfg(S.draft);
   if (a === 'reset') {
@@ -273,6 +285,7 @@ document.addEventListener('input', (e) => {
   if (t.dataset.n) { S.draft.names[t.dataset.n] = t.value; return; }
   const row = t.closest('.erow'); if (!row || !t.dataset.f) return;
   const c = S.draft.chores[+row.dataset.i]; c[t.dataset.f] = t.dataset.f === 'name' || t.dataset.f === 'base' ? t.value : (t.value === '' ? '' : Number(t.value));
+  const li = row.querySelector('.li'); if (li) { li.querySelector('.lnm').textContent = c.name; li.querySelector('.lmeta').innerHTML = `<b>${Number(c.min) || 0}</b>분 · 주 <b>${Number(c.per) || 0}</b>회`; li.querySelector('.lmin').textContent = `${(Number(c.min) || 0) * (Number(c.per) || 0)}분`; }
 });
 document.addEventListener('change', (e) => { if (e.target.dataset?.n) renderSettings(); });
 document.addEventListener('submit', (e) => {

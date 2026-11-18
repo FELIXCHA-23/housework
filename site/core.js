@@ -4,15 +4,16 @@ export const DAY = 86400000;
 export const DEFAULT_CONFIG = {
   names: { A: 'CSB', B: 'YSR' },
   anchor: '2026-11-09', // 1주차 시작(월)
+  m73: true, // 주7회→주3회 변환 완료 표시
   chores: [
-    { id: 'bed', name: '침대·이불 정리, 침실 환기', min: 5, per: 7, base: 'A' },
-    { id: 'tidy', name: '벗어놓은 옷·물건 정리', min: 5, per: 7, base: 'A' },
-    { id: 'living', name: '거실·소파·테이블 정리', min: 10, per: 7, base: 'A' },
-    { id: 'counter', name: '식탁·조리대·싱크대 정리', min: 10, per: 7, base: 'B' },
-    { id: 'dishes', name: '설거지 및 식기 정리', min: 20, per: 7, base: 'B' },
-    { id: 'trash', name: '음식물·일반쓰레기 처리', min: 5, per: 7, base: 'B' },
-    { id: 'bathquick', name: '욕실·세면대 간단 정리', min: 5, per: 7, base: 'B' },
-    { id: 'entry', name: '현관·신발 정리', min: 5, per: 7, base: 'B' },
+    { id: 'bed', name: '침대·이불 정리, 침실 환기', min: 5, per: 3, base: 'A' },
+    { id: 'tidy', name: '벗어놓은 옷·물건 정리', min: 5, per: 3, base: 'A' },
+    { id: 'living', name: '거실·소파·테이블 정리', min: 10, per: 3, base: 'A' },
+    { id: 'counter', name: '식탁·조리대·싱크대 정리', min: 10, per: 3, base: 'B' },
+    { id: 'dishes', name: '설거지 및 식기 정리', min: 20, per: 3, base: 'B' },
+    { id: 'trash', name: '음식물·일반쓰레기 처리', min: 5, per: 3, base: 'B' },
+    { id: 'bathquick', name: '욕실·세면대 간단 정리', min: 5, per: 3, base: 'B' },
+    { id: 'entry', name: '현관·신발 정리', min: 5, per: 3, base: 'B' },
     { id: 'vacuum', name: '청소기·로봇청소기 돌리기', min: 30, per: 2, base: 'B' },
     { id: 'mop', name: '바닥 물걸레질', min: 30, per: 1, base: 'A' },
     { id: 'dust', name: '먼지 제거 및 가구 닦기', min: 20, per: 1, base: 'A' },
@@ -111,6 +112,7 @@ export function sanitizeConfig(c) {
     anchor: /^\d{4}-\d{2}-\d{2}$/.test(c?.anchor) ? mondayOf(c.anchor) : d.anchor,
     chores: [],
   };
+  if (c?.m73) out.m73 = true;
   const seen = new Set();
   for (const x of c?.chores || []) {
     let id = String(x.id || '').replace(/[^\w-]/g, '').slice(0, 24) || 'c' + Math.random().toString(36).slice(2, 8);
