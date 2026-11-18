@@ -1,0 +1,31 @@
+name: Pages domain / HTTPS
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: status | reissue | enforce
+        default: status
+permissions: { pages: write, contents: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      R: ${{ github.repository }}
+      DOMAIN: home.kastlemath.com
+    steps:
+      - name: status
+        run: |
+          gh api repos/$R/pages | jq '{cname, status, https_enforced, html_url, protected_domain_state, https_certificate}'
+          gh api repos/$R/pages/health 2>&1 | head -c 1500 || true
+      - name: reissue (도메인 해제 후 재등록 → 인증서 재발급)
+        if: inputs.action == 'reissue'
+        run: |
+          gh api -X PUT repos/$R/pages -F cname=null -f build_type=workflow && sleep 20
+          gh api -X PUT repos/$R/pages -f cname=$DOMAIN -f build_type=workflow && sleep 30
+          gh api repos/$R/pages | jq '{cname, https_enforced, https_certificate}'
+      - name: enforce https
+        if: inputs.action == 'enforce'
+        run: |
+          gh api -X PUT repos/$R/pages -F https_enforced=true -f cname=$DOMAIN
+          gh api repos/$R/pages | jq '{cname, https_enforced, https_certificate}'
