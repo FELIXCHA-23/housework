@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>집안일</title>
+<style>html,body{margin:0;height:100%;background:#0b0d10;color:#a8b1c0;font:28px sans-serif;display:grid;place-items:center}</style>
+</head>
+<body>
+<div id="m">집안일 현황판을 여는 중…</div>
+<script>
+// 이 앱은 웹 대시보드 주소를 여는 껍데기입니다. 로그인과 사진은 웹 쪽에서 처리합니다.
+var URL = 'https://home.kastlemath.com/tv.html';
+function go() { location.replace(URL); }
+// 인터넷 연결이 늦게 잡힐 수 있어, 연결되면 열고 아니면 5초마다 재시도
+function tryOpen() {
+  if (navigator.onLine === false) { document.getElementById('m').textContent = '인터넷 연결을 기다리는 중…'; return setTimeout(tryOpen, 5000); }
+  go();
+}
+tryOpen();
+</script>
+</body>
+</html>
