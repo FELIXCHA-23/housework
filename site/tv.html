@@ -44,8 +44,8 @@ body { font: 2.2vh/1.3 "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", s
 .last { font-size: 1.8vh; color: var(--muted); margin: -.4vh 0 .8vh; }
 .meter { height: 1vh; border-radius: 9px; background: var(--soft); overflow: hidden; margin-bottom: 1.2vh; }
 .meter i { display: block; height: 100%; background: var(--c); transition: width .6s ease-out; }
-.list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.row { display: flex; align-items: center; justify-content: space-between; gap: .6vw; padding: 0; flex: 1 1 0; min-height: 0; }
+.list { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: .6vw; padding: 0; flex: 0 0 var(--rh, auto); min-height: 0; }
 .row .nm { font-size: var(--fs, 2.5vh); font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row.full .nm { color: var(--muted); text-decoration: line-through; text-decoration-thickness: .2vh; }
 .row.late .nm { color: #ffd166; }
@@ -138,11 +138,13 @@ function render() {
   if (!data) return;
   const root = $('#tv'), m = mainHtml();
   const fa = document.activeElement, fk = fa && fa.dataset && fa.dataset.c ? fa.dataset.o + '|' + fa.dataset.c + '|' + fa.dataset.i : null;
+  const tops = [...document.querySelectorAll('.list')].map((l) => l.scrollTop);
   let ph = root.querySelector('.photo');
   if (!ph) { root.innerHTML = `<div class="photo none" id="ph"><img id="i0" alt=""><img id="i1" alt=""></div><div class="main" id="mn"></div>`; photoReady(); }
   $('#mn').innerHTML = `<div class="top"><div><h1>집안일 임무분담제</h1><span class="wk">${m.wlabel}</span></div><div class="clock"><b>${m.time}</b><span>${m.date}</span></div></div>
     <div class="days">${m.days}</div><div class="cols">${m.cols}</div>`;
   fit();
+  document.querySelectorAll('.list').forEach((l, i) => { if (tops[i]) { l.scrollTop = tops[i]; const st = SC.get(l); if (st) st.y = tops[i]; } });
   let el = null;
   if (fk) { const [o, c, i] = fk.split('|'); el = [...root.querySelectorAll('.pipb')].find((b) => b.dataset.o === o && b.dataset.c === c && b.dataset.i === i); }
   (el || root.querySelector('.pipb'))?.focus({ preventScroll: true });
@@ -150,10 +152,25 @@ function render() {
 // 항목이 많으면 글자·동그라미를 자동으로 줄여서 화면 안에 다 들어가게
 function fit() {
   const mn = $('#mn'), lists = [...document.querySelectorAll('.list')]; if (!mn || !lists.length) return;
-  const n = Math.max(1, ...lists.map((l) => l.children.length)), h = lists[0].clientHeight || innerHeight * 0.5, u = h / n;
-  mn.style.setProperty('--fs', Math.max(11, Math.min(u * 0.52, innerHeight * 0.025)) + 'px');
-  mn.style.setProperty('--pip', Math.max(11, Math.min(u * 0.6, innerHeight * 0.032)) + 'px');
+  const n = Math.max(1, ...lists.map((l) => l.children.length)), h = lists[0].clientHeight || innerHeight * 0.5;
+  const minRow = Math.max(22, innerHeight * 0.03);           // 이보다 작게는 줄이지 않음 (겹침 방지)
+  const rh = n * minRow <= h ? Math.min(h / n, innerHeight * 0.06) : minRow; // 다 들어가면 꽉 채워서, 아니면 최소 높이 + 자동 스크롤
+  mn.style.setProperty('--rh', rh + 'px');
+  mn.style.setProperty('--fs', Math.max(11, Math.min(rh * 0.52, innerHeight * 0.025)) + 'px');
+  mn.style.setProperty('--pip', Math.max(11, Math.min(rh * 0.6, innerHeight * 0.032)) + 'px');
 }
+// 한 화면에 안 들어가는 목록은 천천히 아래로 자동 스크롤 (끝에서 잠시 멈췄다 처음으로)
+const SC = new WeakMap();
+setInterval(() => {
+  for (const l of document.querySelectorAll('.list')) {
+    const max = l.scrollHeight - l.clientHeight; if (max <= 2) { l.scrollTop = 0; continue; }
+    const st = SC.get(l) || { y: l.scrollTop, hold: 60 };
+    if (st.hold > 0) { st.hold--; }
+    else { st.y += 0.7; if (st.y >= max) { st.y = max; st.hold = 80; SC.set(l, st); l.scrollTop = st.y; st.reset = true; } else { l.scrollTop = st.y; } }
+    if (st.reset && st.hold === 0) { st.y = 0; st.hold = 60; st.reset = false; l.scrollTop = 0; }
+    SC.set(l, st);
+  }
+}, 40);
 addEventListener('resize', fit);
 let pending = 0;
 async function refresh() {
