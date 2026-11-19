@@ -34,6 +34,7 @@ body { font: 2.2vh/1.3 "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", s
 .days { display: flex; gap: .8vw; }
 .day { flex: 1; text-align: center; padding: .8vh 0; border-radius: 1.4vh; color: var(--muted); font-size: 2.2vh; background: var(--card); }
 .day b { display: block; font-size: 3vh; color: var(--text); }
+.day.yslot { visibility: hidden; }
 .day.today { outline: .3vh solid var(--text); color: var(--text); }
 .cols { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.4vw; }
 .card { min-width: 0; overflow: hidden; background: var(--card); border-radius: 2vh; padding: 2vh 1.2vw; display: flex; flex-direction: column; min-height: 0; border-top: .7vh solid var(--c); -webkit-backdrop-filter: none; }
@@ -58,13 +59,12 @@ body { font: 2.2vh/1.3 "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", s
 .pip svg { width: 70%; height: 70%; fill: none; stroke: #0e1013; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .empty { color: var(--muted); text-align: center; margin: auto; font-size: 2.6vh; }
 /* 배경음악: 유튜브 임베드 (약관상 영상이 보이는 크기로 우측 상단에 둠) */
-#ytw { position: fixed; top: 3vh; right: 2.6vw; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #000; z-index: 5; box-shadow: 0 1vh 3vh rgba(0,0,0,.5); }
+#ytw { position: fixed; top: 0; left: 0; width: 80px; height: 80px; border-radius: 1.4vh; overflow: hidden; background: #000; z-index: 5; box-shadow: 0 1vh 3vh rgba(0,0,0,.5); }
 #ytw[hidden] { display: none; }
 #yt, #ytw iframe { width: 100%; height: 100%; border: 0; display: block; }
 #ytb { position: absolute; inset: 0; width: 100%; border: 0; background: rgba(0,0,0,.35); color: #fff; font-weight: 700; font-size: 26px; font-family: inherit; cursor: pointer; }
 #ytb.on { background: transparent; color: transparent; }
 #ytb:focus { outline: .45vh solid #fff; outline-offset: -.45vh; }
-.top, .days { padding-right: calc(80px + 1.6vw); }
 .off { position: fixed; right: 2vw; bottom: 1.5vh; font-size: 2vh; color: #ff6b5e; }
 
 /* 로그인 */
@@ -128,7 +128,7 @@ function mainHtml() {
   const [, wm, wd] = wk.split('-').map(Number);
   const wlabel = `${wm}월 ${['첫째', '둘째', '셋째', '넷째', '다섯째'][Math.ceil(wd / 7) - 1]}주`;
   const days = '월화수목금토일'.split('').map((w, i) => { const y = C.addDays(wk, i);
-    return `<div class="day${y === now.ymd ? ' today' : ''}">${w}<b>${Number(y.slice(8))}</b></div>`; }).join('');
+    return `<div class="day${y === now.ymd ? ' today' : ''}">${w}<b>${Number(y.slice(8))}</b></div>`; }).join('') + '<div class="day yslot"></div>';
   const person = (s) => {
     const list = C.choresOf(cfg, wk, s);
     const sum = list.reduce((a, c) => a + c.per, 0);
@@ -160,13 +160,19 @@ function render() {
   if (!ph) { root.innerHTML = `<div class="photo none" id="ph"><img id="i0" alt=""><img id="i1" alt=""></div><div class="main" id="mn"></div>`; photoReady(); }
   $('#mn').innerHTML = `<div class="top"><div><h1>집안일 임무분담제</h1><span class="wk">${m.wlabel}</span></div><div class="clock"><b>${m.time}</b><span>${m.date}</span></div></div>
     <div class="days">${m.days}</div><div class="cols">${m.cols}</div>`;
-  fit();
+  fit(); placeYt();
   document.querySelectorAll('.list').forEach((l, i) => { if (tops[i]) { l.scrollTop = tops[i]; const st = SC.get(l); if (st) st.y = tops[i]; } });
   let el = null;
   if (fk) { const [o, c, i] = fk.split('|'); el = [...root.querySelectorAll('.pipb')].find((b) => b.dataset.o === o && b.dataset.c === c && b.dataset.i === i); }
   (el || root.querySelector('.pipb'))?.focus({ preventScroll: true });
 }
 // 항목이 많으면 글자·동그라미를 자동으로 줄여서 화면 안에 다 들어가게
+// 음악 플레이어를 요일 줄 맨 끝의 빈 칸(일요일 옆)에 같은 크기로 맞춰 놓음
+function placeYt() {
+  const slot = document.querySelector('.yslot'), yw = $('#ytw'); if (!slot || !yw) return;
+  const r = slot.getBoundingClientRect();
+  yw.style.left = r.left + 'px'; yw.style.top = r.top + 'px'; yw.style.width = r.width + 'px'; yw.style.height = r.height + 'px';
+}
 function fit() {
   const mn = $('#mn'), lists = [...document.querySelectorAll('.list')]; if (!mn || !lists.length) return;
   // 음악 플레이어(최소 200px 고정)가 아래 카드와 겹치면 카드를 그만큼 아래로 밀어냄 (화면이 작은 TV 대비)
@@ -191,7 +197,8 @@ setInterval(() => {
     SC.set(l, st);
   }
 }, 40);
-addEventListener('resize', fit);
+addEventListener('resize', () => { fit(); placeYt(); });
+setInterval(placeYt, 500); // 사진이 뜨는 등 레이아웃이 바뀌어도 요일 칸 위치에 계속 맞춤
 let pending = 0;
 async function refresh() {
   if (pending > 0) return;
@@ -228,6 +235,7 @@ async function nextPhoto() {
     im.classList.remove('on'); void im.offsetWidth; im.src = u; bd.style.backgroundImage = `url("${tu}")`;
     im.classList.add('on'); bd.classList.add('on'); old.classList.remove('on'); obd.classList.remove('on');
     $('#ph').classList.remove('none');
+    setTimeout(() => { fit(); placeYt(); }, 50);
     return;
   }
 }
