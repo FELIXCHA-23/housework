@@ -169,6 +169,9 @@ function render() {
 // 항목이 많으면 글자·동그라미를 자동으로 줄여서 화면 안에 다 들어가게
 function fit() {
   const mn = $('#mn'), lists = [...document.querySelectorAll('.list')]; if (!mn || !lists.length) return;
+  // 음악 플레이어(최소 200px 고정)가 아래 카드와 겹치면 카드를 그만큼 아래로 밀어냄 (화면이 작은 TV 대비)
+  const cols = $('.cols'), yw = $('#ytw');
+  if (cols) { cols.style.marginTop = '0px'; if (yw && !yw.hidden) { const d = yw.getBoundingClientRect().bottom + innerHeight * 0.015 - cols.getBoundingClientRect().top; if (d > 0) cols.style.marginTop = d + 'px'; } }
   const n = Math.max(1, ...lists.map((l) => l.children.length)), h = lists[0].clientHeight || innerHeight * 0.5;
   const minRow = Math.max(22, innerHeight * 0.03);           // 이보다 작게는 줄이지 않음 (겹침 방지)
   const rh = n * minRow <= h ? Math.min(h / n, innerHeight * 0.06) : minRow; // 다 들어가면 꽉 채워서, 아니면 최소 높이 + 자동 스크롤
