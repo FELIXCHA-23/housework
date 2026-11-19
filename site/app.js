@@ -168,6 +168,7 @@ function mainScreen() {
   const person = (s) => {
     const list = C.choresOf(cfg, wk, s); const sumPer = list.reduce((a, c) => a + c.per, 0);
     const done = list.reduce((a, c) => a + Math.min(checks[c.id] || 0, c.per), 0);
+    const doneMin = list.reduce((a, c) => a + Math.min(checks[c.id] || 0, c.per) * c.min, 0);
     const dOf = (c) => Math.min(checks[c.id] || 0, c.per);
     const shown = S.filter === 'left' ? list.filter((c) => dOf(c) < c.per) : S.filter === 'zero' ? list.filter((c) => dOf(c) === 0) : list;
     const mine = S.who === s; // 본인 담당만 체크·해제 가능
@@ -176,7 +177,7 @@ function mainScreen() {
       const pip = (i) => `<button class="pipbtn${mine ? '' : ' ro'}"${mine ? '' : ' disabled'} data-act="pip" data-o="${s}" data-c="${esc(c.id)}" data-i="${i}" aria-pressed="${i <= d}" aria-label="${esc(c.name)} ${i}번째"><span class="pip${i <= d ? ' on' : ''}${i <= d && S.fresh.has(c.id + ':' + i) ? ' draw' : ''}">${i <= d ? CHECK_SVG : ''}</span></button>`;
       const pips = Array.from({ length: c.per }, (_, i) => pip(i + 1)).join('');
       const inline = c.per <= 3;
-      return `<div class="chore${d >= c.per ? ' full' : ''}"><div class="row"><div class="nmb"><span class="nm">${esc(c.name)}</span>${c.per > 1 ? `<span class="meta">${d}/${c.per}회</span>` : ''}</div>${inline ? `<span class="pg">${pips}</span>` : ''}</div>${inline ? '' : `<div class="pips">${pips}</div>`}</div>`;
+      return `<div class="chore${d >= c.per ? ' full' : ''}"><div class="row"><div class="nmb"><span class="nm">${esc(c.name)}</span><span class="meta">${c.min}분${c.per === 1 ? '' : ` × ${c.per} · ${d}/${c.per}`}</span></div>${inline ? `<span class="pg">${pips}</span>` : ''}</div>${inline ? '' : `<div class="pips">${pips}</div>`}</div>`;
     };
     // 묶음별 제목(진행률 + 이번 주 한 번도 안 한 개수) + 항목들. 제목을 누르면 접힘
     const rows = GORDER.map((g) => {
@@ -189,7 +190,7 @@ function mainScreen() {
     const hidden = list.length - shown.length;
     const folded = S.who !== s && !(S.unfold || {})[s]; // 상대방 카드는 기본으로 접어 둠
     return `<section class="card person ${s.toLowerCase()}${folded ? ' folded' : ''}"><div class="head"${S.who !== s ? ` data-act="fold" data-w="${s}" role="button" tabindex="0"` : ''}><div><h2><span class="dot"></span>${esc(nm(s))}${S.who === s ? '<span class="me">나</span>' : ''}</h2>${lastTxt(s)}</div>
-      <span class="prog"><b>${done}</b>/${sumPer}회${S.who !== s ? `<i class="chev">${folded ? '▾' : '▴'}</i>` : ''}</span></div><div class="meter"><i style="width:${sumPer ? (done / sumPer) * 100 : 0}%"></i></div>${rows || `<div class="empty">${list.length ? (S.filter === 'zero' ? '이번 주 안 한 항목이 없어요 🎉' : '남은 일이 없어요 🎉') : '이번 주 담당이 없어요'}</div>`}${hidden && rows ? `<div class="hid">완료한 ${hidden}개 숨김</div>` : ''}</section>`;
+      <span class="prog"><b>${done}</b>/${sumPer}회 · ${C.fmtMin(doneMin)}${S.who !== s ? `<i class="chev">${folded ? '▾' : '▴'}</i>` : ''}</span></div><div class="meter"><i style="width:${sumPer ? (done / sumPer) * 100 : 0}%"></i></div>${rows || `<div class="empty">${list.length ? (S.filter === 'zero' ? '이번 주 안 한 항목이 없어요 🎉' : '남은 일이 없어요 🎉') : '이번 주 담당이 없어요'}</div>`}${hidden && rows ? `<div class="hid">완료한 ${hidden}개 숨김</div>` : ''}</section>`;
   };
   const order = S.who === 'B' ? ['B', 'A'] : ['A', 'B'];
   const [, wm, wd] = wk.split('-').map(Number);
