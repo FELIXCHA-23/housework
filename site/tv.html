@@ -57,6 +57,14 @@ body { font: 2.2vh/1.3 "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", s
 .pip.on { background: var(--c); border-color: var(--c); }
 .pip svg { width: 70%; height: 70%; fill: none; stroke: #0e1013; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .empty { color: var(--muted); text-align: center; margin: auto; font-size: 2.6vh; }
+/* 배경음악: 유튜브 임베드 (약관상 영상이 보이는 크기로 우측 상단에 둠) */
+#ytw { position: fixed; top: 3vh; right: 2.6vw; height: 19vh; aspect-ratio: 16 / 9; border-radius: 1.4vh; overflow: hidden; background: #000; z-index: 5; box-shadow: 0 1vh 3vh rgba(0,0,0,.5); }
+#ytw[hidden] { display: none; }
+#yt, #ytw iframe { width: 100%; height: 100%; border: 0; display: block; }
+#ytb { position: absolute; inset: 0; width: 100%; border: 0; background: rgba(0,0,0,.35); color: #fff; font: 700 2.4vh/1.2 inherit; font-family: inherit; cursor: pointer; }
+#ytb.on { background: transparent; color: transparent; }
+#ytb:focus { outline: .45vh solid #fff; outline-offset: -.45vh; }
+.top, .days { padding-right: calc(19vh * 16 / 9 + 1.6vw); }
 .off { position: fixed; right: 2vw; bottom: 1.5vh; font-size: 2vh; color: #ff6b5e; }
 
 /* 로그인 */
@@ -75,6 +83,7 @@ body { font: 2.2vh/1.3 "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", s
 <body>
 <div class="bd" id="bd0"></div><div class="bd" id="bd1"></div><div class="shade"></div>
 <div id="tv"></div>
+<div id="ytw" hidden><div id="yt"></div><button id="ytb" type="button">▶ 음악 켜기</button></div>
 <div class="off" id="off" hidden>연결 끊김 · 다시 시도 중</div>
 <div id="login" hidden><form id="lf" autocomplete="off"><h1>집안일 현황판</h1><p>비밀번호를 입력하세요</p>
   <input type="password" id="pw" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="비밀번호">
@@ -221,9 +230,26 @@ async function nextPhoto() {
 }
 function photoReady() { if (P.items.length) nextPhoto(); }
 
+// ───────── 배경음악 (브라우저 규칙상 소리는 리모컨 확인 버튼을 한 번 눌러야 시작됨)
+const VID = 'YVZrx1-UQvU'; let yp = null;
+function initMusic() {
+  $('#ytw').hidden = false;
+  window.onYouTubeIframeAPIReady = () => {
+    yp = new YT.Player('yt', { videoId: VID, playerVars: { playsinline: 1, controls: 0, rel: 0, modestbranding: 1, loop: 1, playlist: VID, iv_load_policy: 3, fs: 0, disablekb: 1 },
+      events: {
+        onStateChange: (e) => { const b = $('#ytb'); b.classList.toggle('on', e.data === 1 || e.data === 3); b.textContent = e.data === 1 || e.data === 3 ? '' : e.data === 2 ? '▶ 계속 재생' : '▶ 음악 켜기'; },
+        onError: () => { $('#ytb').classList.remove('on'); $('#ytb').textContent = '이 영상은 재생할 수 없어요'; },
+      } });
+  };
+  const sc = document.createElement('script'); sc.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(sc);
+  $('#ytb').addEventListener('click', () => { if (!yp || !yp.getPlayerState) return; if (yp.getPlayerState() === 1) yp.pauseVideo(); else yp.playVideo(); });
+  setTimeout(() => $('#ytb').focus(), 600);
+}
+
 // ───────── 시작
 async function start() {
   if (started) return; started = true;
+  initMusic();
   refresh();
   setInterval(refresh, 30000);
   setInterval(() => { if (data && pending === 0) render(); }, 60000); // 시계·자정 넘김
