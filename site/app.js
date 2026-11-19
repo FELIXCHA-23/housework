@@ -1,4 +1,5 @@
 import * as C from './core.js';
+import { grpOf, GORDER } from './groups.js';
 
 const { URL: SB_URL, ANON, VAPID } = window.HW;
 const $ = (s, r = document) => r.querySelector(s);
@@ -167,20 +168,28 @@ function mainScreen() {
   const person = (s) => {
     const list = C.choresOf(cfg, wk, s); const sumPer = list.reduce((a, c) => a + c.per, 0);
     const done = list.reduce((a, c) => a + Math.min(checks[c.id] || 0, c.per), 0);
-    const doneMin = list.reduce((a, c) => a + Math.min(checks[c.id] || 0, c.per) * c.min, 0);
-    const shown = S.filter === 'left' ? list.filter((c) => Math.min(checks[c.id] || 0, c.per) < c.per) : list;
-    const rows = shown.map((c) => {
-      const d = Math.min(checks[c.id] || 0, c.per);
-      const mine = S.who === s; // 본인 담당만 체크·해제 가능
+    const dOf = (c) => Math.min(checks[c.id] || 0, c.per);
+    const shown = S.filter === 'left' ? list.filter((c) => dOf(c) < c.per) : S.filter === 'zero' ? list.filter((c) => dOf(c) === 0) : list;
+    const mine = S.who === s; // 본인 담당만 체크·해제 가능
+    const rowHtml = (c) => {
+      const d = dOf(c);
       const pip = (i) => `<button class="pipbtn${mine ? '' : ' ro'}"${mine ? '' : ' disabled'} data-act="pip" data-o="${s}" data-c="${esc(c.id)}" data-i="${i}" aria-pressed="${i <= d}" aria-label="${esc(c.name)} ${i}번째"><span class="pip${i <= d ? ' on' : ''}${i <= d && S.fresh.has(c.id + ':' + i) ? ' draw' : ''}">${i <= d ? CHECK_SVG : ''}</span></button>`;
       const pips = Array.from({ length: c.per }, (_, i) => pip(i + 1)).join('');
       const inline = c.per <= 3;
-      return `<div class="chore${d >= c.per ? ' full' : ''}"><div class="row"><div class="nmb"><span class="nm">${esc(c.name)}</span><span class="meta">${c.min}분${c.per === 1 ? '' : ` × ${c.per} · ${d}/${c.per}`}</span></div>${inline ? `<span class="pg">${pips}</span>` : ''}</div>${inline ? '' : `<div class="pips">${pips}</div>`}</div>`;
+      return `<div class="chore${d >= c.per ? ' full' : ''}"><div class="row"><div class="nmb"><span class="nm">${esc(c.name)}</span>${c.per > 1 ? `<span class="meta">${d}/${c.per}회</span>` : ''}</div>${inline ? `<span class="pg">${pips}</span>` : ''}</div>${inline ? '' : `<div class="pips">${pips}</div>`}</div>`;
+    };
+    // 묶음별 제목(진행률 + 이번 주 한 번도 안 한 개수) + 항목들. 제목을 누르면 접힘
+    const rows = GORDER.map((g) => {
+      const mem = shown.filter((c) => grpOf(c.name) === g); if (!mem.length) return '';
+      const all = list.filter((c) => grpOf(c.name) === g);
+      const gd = all.reduce((a, c) => a + dOf(c), 0), gt = all.reduce((a, c) => a + c.per, 0), zero = all.filter((c) => dOf(c) === 0).length;
+      const k = s + '|' + g, open = !(S.gfold || {})[k];
+      return `<div class="grp${open ? '' : ' shut'}" data-act="gfold" data-k="${esc(k)}" role="button" tabindex="0"><span class="gn">${g}</span><span class="gs">${zero ? `<em>안 함 ${zero}</em>` : ''}${gd}/${gt}<i class="chev">${open ? '▴' : '▾'}</i></span></div>${open ? mem.map(rowHtml).join('') : ''}`;
     }).join('');
     const hidden = list.length - shown.length;
     const folded = S.who !== s && !(S.unfold || {})[s]; // 상대방 카드는 기본으로 접어 둠
     return `<section class="card person ${s.toLowerCase()}${folded ? ' folded' : ''}"><div class="head"${S.who !== s ? ` data-act="fold" data-w="${s}" role="button" tabindex="0"` : ''}><div><h2><span class="dot"></span>${esc(nm(s))}${S.who === s ? '<span class="me">나</span>' : ''}</h2>${lastTxt(s)}</div>
-      <span class="prog"><b>${done}</b>/${sumPer}회 · ${C.fmtMin(doneMin)}${S.who !== s ? `<i class="chev">${folded ? '▾' : '▴'}</i>` : ''}</span></div><div class="meter"><i style="width:${sumPer ? (done / sumPer) * 100 : 0}%"></i></div>${rows || `<div class="empty">${list.length ? '남은 일이 없어요 🎉' : '이번 주 담당이 없어요'}</div>`}${hidden && rows ? `<div class="hid">완료한 ${hidden}개 숨김</div>` : ''}</section>`;
+      <span class="prog"><b>${done}</b>/${sumPer}회${S.who !== s ? `<i class="chev">${folded ? '▾' : '▴'}</i>` : ''}</span></div><div class="meter"><i style="width:${sumPer ? (done / sumPer) * 100 : 0}%"></i></div>${rows || `<div class="empty">${list.length ? (S.filter === 'zero' ? '이번 주 안 한 항목이 없어요 🎉' : '남은 일이 없어요 🎉') : '이번 주 담당이 없어요'}</div>`}${hidden && rows ? `<div class="hid">완료한 ${hidden}개 숨김</div>` : ''}</section>`;
   };
   const order = S.who === 'B' ? ['B', 'A'] : ['A', 'B'];
   const [, wm, wd] = wk.split('-').map(Number);
@@ -192,7 +201,7 @@ function mainScreen() {
     <div class="nav"><div class="weektitle"><b>${wlabel}${S.online ? '' : '<span class="pill off">오프라인</span>'}</b></div></div>
     <button class="iconbtn" data-act="next" aria-label="다음 주">›</button><button class="iconbtn" data-act="settings" aria-label="설정">⚙︎</button></header>
     <div class="days">${days}</div>
-    <div class="seg filt" role="group" aria-label="보기">${[['all', '전체'], ['left', '남은 것만']].map(([v, l]) => `<button data-act="filter" data-v="${v}" class="${(S.filter || 'all') === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="seg filt" role="group" aria-label="보기">${[['all', '전체'], ['left', '남은 것만'], ['zero', '안 한 것']].map(([v, l]) => `<button data-act="filter" data-v="${v}" class="${(S.filter || 'all') === v ? 'on' : ''}">${l}</button>`).join('')}</div>
     ${isNow ? '' : '<div class="today"><button data-act="today">이번 주로 돌아가기</button></div>'}
     <section class="card sum"><div class="names"><div class="who"><span class="nm">${esc(nm('A'))}</span><span class="mn a">${load.A}<small>분</small></span></div>
       <div class="who"><span class="nm">${esc(nm('B'))}</span><span class="mn b">${load.B}<small>분</small></span></div></div>
@@ -260,6 +269,7 @@ document.addEventListener('click', async (e) => {
     return setCheck(c, i <= cur ? i - 1 : i);
   }
   if (a === 'fold') { (S.unfold ||= {})[el.dataset.w] = !S.unfold[el.dataset.w]; return render(); }
+  if (a === 'gfold') { (S.gfold ||= {})[el.dataset.k] = !S.gfold[el.dataset.k]; return render(); }
   if (a === 'filter') { S.filter = el.dataset.v; ls.set('hw_filter', S.filter); return render(); }
   if (a === 'prev') { S.wk = C.addDays(S.wk, -7); return render(); }
   if (a === 'next') { S.wk = C.addDays(S.wk, 7); return render(); }
@@ -315,7 +325,7 @@ async function dynamicManifest() {
 (async function init() {
   applyTheme();
   const uk = urlKey(); if (uk) ls.set('hw_key', uk);
-  S.filter = ls.get('hw_filter') === 'left' ? 'left' : 'all';
+  S.filter = ['left', 'zero'].includes(ls.get('hw_filter')) ? ls.get('hw_filter') : 'all';
   S.key = window.HW.KEY || uk || ls.get('hw_key'); S.who = ls.get('hw_who');
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then((r) => { swReg = r; }).catch(() => {});
   try { const c = JSON.parse(ls.get('hw_cache') || 'null'); if (c) applyServer(c); } catch { /* noop */ }

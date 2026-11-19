@@ -224,3 +224,12 @@ input:focus, select:focus { border-color: var(--a); }
 .person .head[data-act="fold"] { cursor: pointer; }
 .chev { font-style: normal; margin-left: 8px; color: var(--muted); }
 .person.folded > :not(.head):not(.meter) { display: none; }
+
+/* 묶음 제목 */
+.grp { display: flex; align-items: center; justify-content: space-between; margin: 10px -4px 0; padding: 7px 8px; border-radius: 10px; background: var(--field); cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); }
+.grp .gn { color: var(--text); }
+.grp .gs { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.grp em { font-style: normal; font-size: 11px; font-weight: 700; color: #b45309; background: color-mix(in srgb, #f59e0b 22%, transparent); padding: 1px 7px; border-radius: 99px; }
+.grp .chev { margin-left: 0; }
+.grp + .chore { border-top: 0; }
+.filt button { font-size: 14px; }
