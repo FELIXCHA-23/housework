@@ -242,7 +242,7 @@ async function mutateShop(fn, quiet) {
 }
 
 // ───────── 설정(편집)
-function openSettings() { S.openRow = null; S.draft = JSON.parse(JSON.stringify(S.cfg)); S.view = 'settings'; S.armed = false; getPush().then((p) => { S.push = p; if (S.view === 'settings') renderSettings(); }); S.sheetIn = true; setTimeout(() => { S.sheetIn = false; }, 400); renderSettings(); window.scrollTo(0, 0); }
+function openSettings() { S.openRow = null; S.setWho = S.who; S.draft = JSON.parse(JSON.stringify(S.cfg)); S.view = 'settings'; S.armed = false; getPush().then((p) => { S.push = p; if (S.view === 'settings') renderSettings(); }); S.sheetIn = true; setTimeout(() => { S.sheetIn = false; }, 400); renderSettings(); window.scrollTo(0, 0); }
 function renderSettings() {
   const d = S.draft, p = S.push, theme = ls.get('hw_theme') || 'auto';
   let pushHtml;
@@ -261,17 +261,22 @@ function renderSettings() {
   const stepper = (i, f, v, unit, step, min, max) => `<div class="stp"><button class="sbtn" data-act="step" data-i="${i}" data-f="${f}" data-d="${-step}" data-min="${min}" data-max="${max}" aria-label="빼기">−</button><input type="number" inputmode="numeric" data-f="${f}" value="${v}" min="${min}" max="${max}"><span class="unit">${unit}</span><button class="sbtn" data-act="step" data-i="${i}" data-f="${f}" data-d="${step}" data-min="${min}" data-max="${max}" aria-label="더하기">+</button></div>`;
   const erow = (c, i) => {
     const open = S.openRow === i, to = c.base === 'A' ? 'B' : 'A';
-    const line = `<button class="li" data-act="row" data-i="${i}" aria-expanded="${open}"><span class="lnm">${esc(c.name)}</span><span class="lmeta"><b>${Number(c.min) || 0}</b>분 · 주 <b>${Number(c.per) || 0}</b>회</span><span class="lmin">${(Number(c.min) || 0) * (Number(c.per) || 0)}분</span></button>`;
+    const line = `<button class="li" data-act="row" data-i="${i}" aria-expanded="${open}"><span class="lnm">${esc(c.name)}</span><span class="lmeta"><b>${Number(c.min) || 0}</b>분 · 주 <b>${Number(c.per) || 0}</b>회</span></button>`;
     if (!open) return `<div class="erow" data-i="${i}">${line}</div>`;
     return `<div class="erow open" data-i="${i}">${line}<div class="edit"><input type="text" data-f="name" value="${esc(c.name)}" aria-label="집안일 이름" maxlength="40">
       <div class="editgrid"><label>1회</label>${stepper(i, 'min', c.min, '분', 5, 0, 999)}<label>주당</label>${stepper(i, 'per', c.per, '회', 1, 1, 14)}</div>
       <div class="row2"><button class="btn sm" data-act="swap" data-i="${i}">→ ${esc(d.names[to])}</button><button class="btn sm danger" data-act="del" data-i="${i}">삭제</button><button class="btn sm" data-act="row" data-i="${i}">접기</button></div></div></div>`;
   };
-  const group = (w) => { const list = d.chores.map((c, i) => [c, i]).filter(([c]) => c.base === w);
-    const mins = list.reduce((a, [c]) => a + (Number(c.min) || 0) * (Number(c.per) || 0), 0);
-    return `<div class="grp ${w.toLowerCase()}"><div class="grphead"><b>${esc(d.names[w])}</b><span>${list.length}개 · 주 ${C.fmtMin(mins)}</span></div>
-      <div class="lst">${list.map(([c, i]) => erow(c, i)).join('') || '<div class="empty">없음</div>'}</div><button class="btn sm addbtn" data-act="add" data-b="${w}">+ ${esc(d.names[w])} 집안일 추가</button></div>`; };
-  const chores = group('A') + group('B');
+  // 사람(탭) → 묶음(제목) → 한 줄 목록. 한 번에 한 사람만 보여서 화면이 좁아도 읽기 편함.
+  const tw = S.setWho || S.who || 'A';
+  const mine = d.chores.map((c, i) => [c, i]).filter(([c]) => c.base === tw);
+  const sumMin = (arr) => arr.reduce((a, [c]) => a + (Number(c.min) || 0) * (Number(c.per) || 0), 0);
+  const ptab = (w) => { const l = d.chores.filter((c) => c.base === w); const m = l.reduce((a, c) => a + (Number(c.min) || 0) * (Number(c.per) || 0), 0);
+    return `<button role="tab" data-act="setwho" data-v="${w}" aria-selected="${tw === w}" class="ptab ${w.toLowerCase()}${tw === w ? ' on' : ''}"><b>${esc(d.names[w])}</b><span>${l.length}개 · ${C.fmtMin(m)}</span></button>`; };
+  const groups = GORDER.map((g) => { const mem = mine.filter(([c]) => grpOf(c.name) === g); if (!mem.length) return '';
+    return `<div class="sgh"><span>${g}</span><span>${mem.length}개 · ${C.fmtMin(sumMin(mem))}</span></div>${mem.map(([c, i]) => erow(c, i)).join('')}`; }).join('');
+  const chores = `<div class="ptabs" role="tablist">${ptab('A')}${ptab('B')}</div><div class="slist ${tw.toLowerCase()}">${groups || '<div class="empty">담당이 없어요</div>'}</div>
+    <button class="btn addbtn" data-act="add" data-b="${tw}">+ ${esc(d.names[tw])} 집안일 추가</button>`;
     $('#app').innerHTML = `<div class="wrap${S.sheetIn ? ' sheet-in' : ''}"><header class="top"><button class="iconbtn" data-act="back" aria-label="뒤로">‹</button><div class="nav"><div class="weektitle"><b>설정</b></div></div><span style="width:44px"></span></header>
   <h3>알림</h3><section class="card">${pushHtml}</section>
   <h3>내 정보</h3><section class="card"><div class="row2" style="align-items:center;justify-content:space-between"><span>이 기기: <b>${esc(nm(S.who))}</b></span><button class="btn sm" data-act="chwho">바꾸기</button></div></section>
@@ -323,6 +328,7 @@ document.addEventListener('click', async (e) => {
   if (a === 'pushon') return enablePush();
   if (a === 'pushoff') return disablePush();
   if (a === 'test') return testPush();
+  if (a === 'setwho') { S.setWho = el.dataset.v; S.openRow = null; return renderSettings(); }
   if (a === 'row') { const i = +el.dataset.i; S.openRow = S.openRow === i ? null : i; renderSettings(); return document.querySelector(`.erow[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' }); }
   if (a === 'step') { const c = S.draft.chores[+el.dataset.i], f = el.dataset.f; c[f] = Math.min(+el.dataset.max, Math.max(+el.dataset.min, (Number(c[f]) || 0) + +el.dataset.d)); return renderSettings(); }
   if (a === 'swap') { const c = S.draft.chores[+el.dataset.i]; c.base = c.base === 'A' ? 'B' : 'A'; return renderSettings(); }
@@ -343,7 +349,7 @@ document.addEventListener('input', (e) => {
   if (t.dataset.n) { S.draft.names[t.dataset.n] = t.value; return; }
   const row = t.closest('.erow'); if (!row || !t.dataset.f) return;
   const c = S.draft.chores[+row.dataset.i]; c[t.dataset.f] = t.dataset.f === 'name' || t.dataset.f === 'base' ? t.value : (t.value === '' ? '' : Number(t.value));
-  const li = row.querySelector('.li'); if (li) { li.querySelector('.lnm').textContent = c.name; li.querySelector('.lmeta').innerHTML = `<b>${Number(c.min) || 0}</b>분 · 주 <b>${Number(c.per) || 0}</b>회`; li.querySelector('.lmin').textContent = `${(Number(c.min) || 0) * (Number(c.per) || 0)}분`; }
+  const li = row.querySelector('.li'); if (li) { li.querySelector('.lnm').textContent = c.name; li.querySelector('.lmeta').innerHTML = `<b>${Number(c.min) || 0}</b>분 · 주 <b>${Number(c.per) || 0}</b>회`; }
 });
 document.addEventListener('change', (e) => { if (e.target.dataset?.n) renderSettings(); });
 document.addEventListener('submit', (e) => {
