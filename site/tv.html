@@ -41,6 +41,7 @@ body { font: 2.2vh/1.3 "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", s
 .card.a { --c: var(--a); --soft: var(--a-soft); } .card.b { --c: var(--b); --soft: var(--b-soft); }
 .head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: .8vh; }
 .head h2 { margin: 0; font-size: 3.6vh; color: var(--c); }
+.head .tm { margin: 0 1.2vw 0 auto; font-size: 2.2vh; color: var(--muted); white-space: nowrap; } .head .tm b { color: var(--c); font-size: 2.8vh; }
 .head .prog { font-size: 2.4vh; color: var(--muted); } .head .prog b { color: var(--text); font-size: 3.2vh; }
 .last { font-size: 1.8vh; color: var(--muted); margin: -.4vh 0 .8vh; }
 .meter { height: 1vh; border-radius: 9px; background: var(--soft); overflow: hidden; margin-bottom: 1.2vh; }
@@ -133,6 +134,7 @@ function mainHtml() {
     const list = C.choresOf(cfg, wk, s);
     const sum = list.reduce((a, c) => a + c.per, 0);
     const done = list.reduce((a, c) => a + Math.min(checks[c.id] || 0, c.per), 0);
+    const doneMin = list.reduce((a, c) => a + Math.min(checks[c.id] || 0, c.per) * c.min, 0), totMin = list.reduce((a, c) => a + c.per * c.min, 0);
     const rowHtml = (c) => {
       const d = Math.min(checks[c.id] || 0, c.per);
       const late = d < C.dueBy(c.per, now.dow);
@@ -145,7 +147,7 @@ function mainHtml() {
       const gd = mem.reduce((a, c) => a + Math.min(checks[c.id] || 0, c.per), 0), gt = mem.reduce((a, c) => a + c.per, 0);
       return `<div class="gh"><span>${g}</span><span>${gd}/${gt}</span></div>` + mem.map(rowHtml).join('');
     }).join('');
-    return `<section class="card ${s.toLowerCase()}"><div class="head"><h2>${esc(cfg.names[s])}</h2><span class="prog"><b>${done}</b>/${sum}회</span></div>${lastTxt(s)}
+    return `<section class="card ${s.toLowerCase()}"><div class="head"><h2>${esc(cfg.names[s])}</h2><span class="tm">수행 <b>${C.fmtMin(doneMin)}</b> / ${C.fmtMin(totMin)}</span><span class="prog"><b>${done}</b>/${sum}회</span></div>${lastTxt(s)}
       <div class="meter"><i style="width:${sum ? (done / sum) * 100 : 0}%"></i></div><div class="list">${rows || '<div class="empty">이번 주 담당 없음</div>'}</div></section>`;
   };
   const k = new Date(Date.now() + 9 * 3600e3), p2 = (x) => String(x).padStart(2, '0');
