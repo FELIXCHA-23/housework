@@ -113,6 +113,7 @@ export function sanitizeConfig(c) {
     chores: [],
   };
   if (c?.m73) out.m73 = true;
+  out.shop = sanitizeShop(c?.shop);
   const seen = new Set();
   for (const x of c?.chores || []) {
     let id = String(x.id || '').replace(/[^\w-]/g, '').slice(0, 24) || 'c' + Math.random().toString(36).slice(2, 8);
@@ -128,3 +129,19 @@ export function sanitizeConfig(c) {
   }
   return out;
 }
+
+// 같이 쓰는 장보기 목록: [{ id, t, by:'A'|'B', at:'YYYY-MM-DD', done, dwk:'산 주의 월요일' }]
+export function sanitizeShop(list) {
+  const out = []; const seen = new Set();
+  for (const x of Array.isArray(list) ? list : []) {
+    const id = String(x?.id || '').replace(/[^\w-]/g, '').slice(0, 24); const t = String(x?.t ?? '').trim().slice(0, 40);
+    if (!id || !t || seen.has(id)) continue; seen.add(id);
+    const it = { id, t, by: x.by === 'B' ? 'B' : 'A', at: /^\d{4}-\d{2}-\d{2}$/.test(x.at) ? x.at : '', done: !!x.done };
+    if (it.done && /^\d{4}-\d{2}-\d{2}$/.test(x.dwk)) it.dwk = x.dwk;
+    out.push(it);
+    if (out.length >= 200) break;
+  }
+  return out;
+}
+// 지난주(또는 그 전)에 산 것은 자동으로 정리
+export const pruneShop = (list, wkNow) => list.filter((x) => !(x.done && x.dwk && x.dwk < wkNow));

@@ -12,7 +12,7 @@ const ls = {
 const sb = window.supabase.createClient(SB_URL, ANON, { auth: { persistSession: false, autoRefreshToken: false }, realtime: { params: { eventsPerSecond: 10 } } });
 
 const S = {
-  key: null, who: null, cfg: null, checks: {}, wk: C.mondayOf(C.kstNow().ymd),
+  key: null, who: null, tab: ls.get('hw_tab') || 'chores', cfg: null, checks: {}, wk: C.mondayOf(C.kstNow().ymd),
   view: 'main', draft: null, online: true, pending: 0, dirty: false, keyError: false,
   push: { supported: false }, armed: false, busy: false,
 };
@@ -67,6 +67,7 @@ async function refresh() {
     const next = { ...S.cfg, m73: true, chores: S.cfg.chores.map((c) => (c.per === 7 ? { ...c, per: 3 } : c)) };
     const r = await rpc('hw_save_config', { p_data: next }); if (!r.error) S.cfg = C.sanitizeConfig(next);
   }
+  { const wkNow = C.mondayOf(C.kstNow().ymd); if (C.pruneShop(S.cfg.shop || [], wkNow).length !== (S.cfg.shop || []).length) mutateShop((l) => C.pruneShop(l, wkNow), true); }
   if (S.view !== 'settings') render(); else renderPartialOnline();
 }
 // 사람별 마지막 체크 시각 (KST)
@@ -151,7 +152,9 @@ function render() {
   if (!S.cfg) return (app.innerHTML = `<div class="wrap"><div class="center"><h1>집안일 임무분담제</h1><p class="note">${SPIN}불러오는 중…</p></div></div>`);
   if (!S.who) return (app.innerHTML = whoScreen());
   if (S.view === 'settings') return renderSettings();
-  const st = window.scrollY; app.innerHTML = mainScreen(); window.scrollTo(0, st);
+  const ae = document.activeElement, keep = ae && ae.matches?.('.shopadd input') ? { v: ae.value, s: ae.selectionStart } : null; // 입력 중 동기화돼도 글자 유지
+  const st = window.scrollY; app.innerHTML = S.tab === 'shop' ? shopScreen() : mainScreen(); window.scrollTo(0, st);
+  if (keep) { const i = $('.shopadd input'); if (i) { i.value = keep.v; i.focus(); try { i.setSelectionRange(keep.s, keep.s); } catch { /* noop */ } } }
   if (!S.introDone) { app.firstElementChild.classList.add('intro'); S.introDone = true; } // 첫 화면에서만 Stagger
 }
 const keyScreen = () => `<div class="wrap"><form class="center" data-act="key"><h1>집안일</h1><p class="note">공유받은 주소로 들어오면 자동으로 열려요. 아니라면 비밀 키를 입력해 주세요.</p>
@@ -198,7 +201,7 @@ function mainScreen() {
   const todayYmd = C.kstNow().ymd;
   const days = '월화수목금토일'.split('').map((w, i) => { const y = C.addDays(wk, i);
     return `<div class="day${y === todayYmd ? ' today' : ''}"><span class="dw">${w}</span><span class="dn">${Number(y.slice(8))}</span></div>`; }).join('');
-  return `<div class="wrap"><div class="apptitle">집안일 임무분담제</div><header class="top"><span style="width:44px;flex:none" aria-hidden="true"></span><button class="iconbtn" data-act="prev" aria-label="이전 주">‹</button>
+  return `<div class="wrap"><div class="apptitle">집안일 임무분담제</div>${tabs()}<header class="top"><span style="width:44px;flex:none" aria-hidden="true"></span><button class="iconbtn" data-act="prev" aria-label="이전 주">‹</button>
     <div class="nav"><div class="weektitle"><b>${wlabel}${S.online ? '' : '<span class="pill off">오프라인</span>'}</b></div></div>
     <button class="iconbtn" data-act="next" aria-label="다음 주">›</button><button class="iconbtn" data-act="settings" aria-label="설정">⚙︎</button></header>
     <div class="days">${days}</div>
@@ -209,6 +212,33 @@ function mainScreen() {
       <div class="bar" role="img" aria-label="${esc(nm('A'))} ${Math.round(pa)}%, ${esc(nm('B'))} ${Math.round(100 - pa)}%"><i class="a" style="width:${pa}%"></i><i class="b" style="width:${100 - pa}%"></i></div>
       <div class="diff">${gap === 0 ? '<b>딱 균형</b>이에요' : `차이 <b>${gap}분</b> · ${esc(nm(heavier))} 쪽이 더 많아요`} <span style="opacity:.7">(${Math.round(pa)} : ${Math.round(100 - pa)})</span></div></section>
     ${order.map(person).join('')}</div>`;
+}
+
+// ───────── 장보기 (둘이 같이 쓰는 목록)
+const tabs = () => { const n = (S.cfg.shop || []).filter((x) => !x.done).length;
+  return `<div class="seg tabs" role="tablist">${[['chores', '집안일'], ['shop', `장보기${n ? ` <span class="cnt">${n}</span>` : ''}`]].map(([v, l]) => `<button role="tab" data-act="tab" data-v="${v}" aria-selected="${(S.tab || 'chores') === v}" class="${(S.tab || 'chores') === v ? 'on' : ''}">${l}</button>`).join('')}</div>`; };
+function shopScreen() {
+  const list = S.cfg.shop || [], todo = list.filter((x) => !x.done), done = list.filter((x) => x.done);
+  const row = (x) => `<div class="srow${x.done ? ' on' : ''}"><button class="sck" data-act="shoptog" data-id="${esc(x.id)}" aria-pressed="${x.done}" aria-label="${esc(x.t)} ${x.done ? '안 산 걸로' : '샀음'}"><span class="pip${x.done ? ' on' : ''}">${x.done ? CHECK_SVG : ''}</span></button>
+    <span class="st">${esc(x.t)}</span><span class="sby ${x.by.toLowerCase()}">${esc(nm(x.by))}</span><button class="sx" data-act="shopdel" data-id="${esc(x.id)}" aria-label="${esc(x.t)} 삭제">×</button></div>`;
+  return `<div class="wrap"><div class="apptitle">집안일 임무분담제</div>${tabs()}
+    <form class="shopadd" data-act="shopadd"><input type="text" name="t" placeholder="살 것 (예: 우유 2개)" maxlength="40" autocomplete="off" enterkeyhint="done" aria-label="살 것"><button class="btn primary" type="submit">추가</button></form>
+    <section class="card shop">${todo.map(row).join('') || '<div class="empty">살 게 없어요. 위에 적으면 상대 폰에도 바로 보여요.</div>'}</section>
+    ${done.length ? `<div class="shoph"><span>산 것 ${done.length}개</span><button data-act="shopclear">산 것 지우기</button></div><section class="card shop">${done.map(row).join('')}</section>` : ''}
+    <p class="note">체크한 건 다음 주 월요일에 자동으로 지워지고, 안 산 건 그대로 남아요.</p>
+    ${list.length ? `<button class="btn danger${S.shopArmed ? ' armed' : ''}" data-act="shopall" style="margin-top:12px">${S.shopArmed ? '정말 다 지울까요? 한 번 더 누르세요' : '목록 전체 비우기'}</button>` : ''}</div>`;
+}
+// 서버 최신본에 같은 변경을 적용해서 저장(둘이 동시에 고쳐도 서로 덮어쓰지 않게)
+async function mutateShop(fn, quiet) {
+  S.cfg.shop = fn([...(S.cfg.shop || [])]); if (!quiet) render();
+  S.pending++;
+  try {
+    const { data, error } = await rpc('hw_get'); if (error) throw error;
+    const fresh = C.sanitizeConfig(data.config || S.cfg); fresh.shop = C.sanitizeShop(fn(fresh.shop || []));
+    const r = await rpc('hw_save_config', { p_data: fresh }); if (r.error) throw r.error;
+    S.cfg = fresh;
+  } catch (e) { if (isAuthErr(e)) onError(e); else toast('저장 실패 — 연결을 확인해 주세요'); S.dirty = true; }
+  S.pending--; if (S.pending === 0 && S.dirty) { S.dirty = false; refresh(); } else if (S.view !== 'settings') render();
 }
 
 // ───────── 설정(편집)
@@ -255,6 +285,7 @@ function renderSettings() {
 }
 async function saveCfg(cfg, msg) {
   const clean = C.sanitizeConfig(cfg);
+  { const f = await rpc('hw_get'); clean.shop = C.sanitizeShop(f.data?.config?.shop ?? S.cfg.shop); } // 편집 중 바뀐 장보기 목록을 덮어쓰지 않게
   const { error } = await rpc('hw_save_config', { p_data: clean });
   if (error) { if (isAuthErr(error)) return onError(error); return toast('저장 실패 — 연결을 확인해 주세요'); }
   closeSheet(() => { S.cfg = clean; S.draft = null; S.view = 'main'; toast(msg || '저장했어요'); render(); refresh(); });
@@ -272,6 +303,15 @@ document.addEventListener('click', async (e) => {
   if (a === 'fold') { (S.unfold ||= {})[el.dataset.w] = !S.unfold[el.dataset.w]; return render(); }
   if (a === 'gfold') { (S.gfold ||= {})[el.dataset.k] = !S.gfold[el.dataset.k]; return render(); }
   if (a === 'filter') { S.filter = el.dataset.v; ls.set('hw_filter', S.filter); return render(); }
+  if (a === 'tab') { S.tab = el.dataset.v; ls.set('hw_tab', S.tab); window.scrollTo(0, 0); return render(); }
+  if (a === 'shoptog') { const id = el.dataset.id, x = (S.cfg.shop || []).find((i) => i.id === id); if (!x) return; const v = !x.done, wkNow = C.mondayOf(C.kstNow().ymd);
+    return mutateShop((l) => l.map((i) => (i.id === id ? { ...i, done: v, dwk: v ? wkNow : undefined } : i))); }
+  if (a === 'shopdel') { const id = el.dataset.id; return mutateShop((l) => l.filter((i) => i.id !== id)); }
+  if (a === 'shopclear') return mutateShop((l) => l.filter((i) => !i.done));
+  if (a === 'shopall') {
+    if (!S.shopArmed) { S.shopArmed = true; render(); setTimeout(() => { if (S.shopArmed) { S.shopArmed = false; render(); } }, 4000); return; }
+    S.shopArmed = false; const ids = new Set((S.cfg.shop || []).map((i) => i.id)); return mutateShop((l) => l.filter((i) => !ids.has(i.id)));
+  }
   if (a === 'prev') { S.wk = C.addDays(S.wk, -7); return render(); }
   if (a === 'next') { S.wk = C.addDays(S.wk, 7); return render(); }
   if (a === 'today') { S.wk = C.mondayOf(C.kstNow().ymd); return render(); }
@@ -293,9 +333,9 @@ document.addEventListener('click', async (e) => {
   if (a === 'reset') {
     if (!S.armed) { S.armed = true; renderSettings(); setTimeout(() => { if (S.armed) { S.armed = false; if (S.view === 'settings') renderSettings(); } }, 4000); return; }
     S.armed = false;
-    const { error } = await rpc('hw_reset', { p_data: C.cloneDefault() });
+    const { error } = await rpc('hw_reset', { p_data: { ...C.cloneDefault(), shop: S.cfg.shop || [] } });
     if (error) return toast('초기화 실패 — 연결을 확인해 주세요');
-    S.cfg = C.cloneDefault(); S.checks = {}; S.draft = null; S.view = 'main'; S.wk = C.mondayOf(C.kstNow().ymd); toast('초기화했어요'); render(); return;
+    S.cfg = { ...C.cloneDefault(), shop: S.cfg.shop || [] }; S.checks = {}; S.draft = null; S.view = 'main'; S.wk = C.mondayOf(C.kstNow().ymd); toast('초기화했어요'); render(); return;
   }
 });
 document.addEventListener('input', (e) => {
@@ -307,6 +347,10 @@ document.addEventListener('input', (e) => {
 });
 document.addEventListener('change', (e) => { if (e.target.dataset?.n) renderSettings(); });
 document.addEventListener('submit', (e) => {
+  const sf = e.target.closest('form[data-act="shopadd"]');
+  if (sf) { e.preventDefault(); const inp = sf.querySelector('input'); const t = inp.value.trim(); if (!t) return;
+    const item = { id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), t: t.slice(0, 40), by: S.who, at: C.kstNow().ymd, done: false };
+    inp.value = ''; mutateShop((l) => [...l, item]); return; }
   const f = e.target.closest('form[data-act="key"]'); if (!f) return; e.preventDefault();
   const k = new FormData(f).get('k').trim(); if (!k) return;
   ls.set('hw_key', k); location.replace(location.pathname + '?k=' + encodeURIComponent(k));
