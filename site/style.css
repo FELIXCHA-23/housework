@@ -159,6 +159,7 @@ input:focus, select:focus { border-color: var(--a); }
 }
 
 .pipbtn.ro { cursor: default; pointer-events: none; }
+.pipbtn.help .pip:not(.on) { border-style: dashed; opacity: .75; } /* 상대방 항목: 도와주기 체크 */
 
 /* 설정: 담당 A(왼쪽)·B(오른쪽) 두 칸 */
 .setcard { padding-left: 10px; padding-right: 10px; }

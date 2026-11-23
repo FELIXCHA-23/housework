@@ -177,7 +177,7 @@ function mainScreen() {
     const mine = S.who === s; // 본인 담당만 체크·해제 가능
     const rowHtml = (c) => {
       const d = dOf(c);
-      const pip = (i) => `<button class="pipbtn${mine ? '' : ' ro'}"${mine ? '' : ' disabled'} data-act="pip" data-o="${s}" data-c="${esc(c.id)}" data-i="${i}" aria-pressed="${i <= d}" aria-label="${esc(c.name)} ${i}번째"><span class="pip${i <= d ? ' on' : ''}${i <= d && S.fresh.has(c.id + ':' + i) ? ' draw' : ''}">${i <= d ? CHECK_SVG : ''}</span></button>`;
+      const pip = (i) => `<button class="pipbtn${mine ? '' : ' help'}" data-act="pip" data-o="${s}" data-c="${esc(c.id)}" data-i="${i}" aria-pressed="${i <= d}" aria-label="${esc(c.name)} ${i}번째"><span class="pip${i <= d ? ' on' : ''}${i <= d && S.fresh.has(c.id + ':' + i) ? ' draw' : ''}">${i <= d ? CHECK_SVG : ''}</span></button>`;
       const pips = Array.from({ length: c.per }, (_, i) => pip(i + 1)).join('');
       const inline = c.per <= 3;
       return `<div class="chore${d >= c.per ? ' full' : ''}"><div class="row"><div class="nmb"><span class="nm">${esc(c.name)}</span><span class="meta">${c.min}분${c.per === 1 ? '' : ` × ${c.per} · ${d}/${c.per}`}</span></div>${inline ? `<span class="pg">${pips}</span>` : ''}</div>${inline ? '' : `<div class="pips">${pips}</div>`}</div>`;
@@ -301,8 +301,8 @@ document.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act;
   if (a === 'pip') {
-    if (el.dataset.o !== S.who) return toast('상대방 항목은 체크할 수 없어요');
-    const c = S.cfg.chores.find((x) => x.id === el.dataset.c); const i = +el.dataset.i; const cur = Math.min((S.checks[S.wk] || {})[c.id] || 0, c.per);
+    const c =S.cfg.chores.find((x) => x.id === el.dataset.c); const i = +el.dataset.i; const cur = Math.min((S.checks[S.wk] || {})[c.id] || 0, c.per);
+    if (el.dataset.o !== S.who && i > cur) toast('도와주기 체크 🤝');
     return setCheck(c, i <= cur ? i - 1 : i);
   }
   if (a === 'fold') { (S.unfold ||= {})[el.dataset.w] = !S.unfold[el.dataset.w]; return render(); }
