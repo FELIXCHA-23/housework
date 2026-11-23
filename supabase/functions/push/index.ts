@@ -56,7 +56,9 @@ Deno.serve(async (req) => {
       const name = cfg.names[actor];
       const label = chore ? chore.name : '집안일';
       const extra = chore && chore.per > 1 ? ` (${body.done}/${chore.per})` : '';
-      results.push(await send(devices, other(actor), { title: '집안일', body: `${name}: ${label} 완료${extra}` }));
+      const owner = chore ? ownerOf(chore, weekNo(String(body.wk || wkNow), cfg.anchor)) : actor;
+      const help = owner !== actor ? ' (도와줌)' : '';
+      results.push(await send(devices, other(actor), { title: '집안일', body: `${name}: ${label} 완료${extra}${help}` }));
     } else if (body.type === 'test') {
       const who = (body.who === 'B' ? 'B' : 'A') as 'A' | 'B';
       results.push(await send(devices, who, { title: '테스트 알림', body: `${cfg.names[who]}님, 알림이 정상적으로 도착했어요 ✅` }));
