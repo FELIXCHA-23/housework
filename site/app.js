@@ -188,7 +188,7 @@ function mainScreen() {
       const all = list.filter((c) => grpOf(c.name) === g);
       const gd = all.reduce((a, c) => a + dOf(c), 0), gt = all.reduce((a, c) => a + c.per, 0), zero = all.filter((c) => dOf(c) === 0).length;
       const k = s + '|' + g, open = !(S.gfold || {})[k];
-      return `<div class="grp${open ? '' : ' shut'}" data-act="gfold" data-k="${esc(k)}" role="button" tabindex="0"><span class="gn">${g}</span><span class="gs">${zero ? `<em>안 함 ${zero}</em>` : ''}${gd}/${gt}<i class="chev">${open ? '▴' : '▾'}</i></span></div>${open ? mem.map(rowHtml).join('') : ''}`;
+      return `<div class="grp${open ? '' : ' shut'}" aria-expanded="${open}" data-act="gfold" data-k="${esc(k)}" role="button" tabindex="0"><span class="gn">${g}</span><span class="gs">${zero ? `<em>${zero}개 안 함</em>` : ''}<span class="gp"><b>${gd}</b>/${gt}</span><i class="gchev" aria-hidden="true"></i></span></div>${open ? `<div class="gbody">${mem.map(rowHtml).join('')}</div>` : ''}`;
     }).join('');
     const hidden = list.length - shown.length;
     const folded = S.who !== s && !(S.unfold || {})[s]; // 상대방 카드는 기본으로 접어 둠

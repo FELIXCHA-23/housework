@@ -205,6 +205,42 @@ input:focus, select:focus { border-color: var(--a); }
 .edit .row2 .btn.danger { color: var(--danger); }
 .addbtn { width: 100%; margin-top: 12px; font-size: 14px; }
 
+/* 촘촘한 한 줄 목록: 이름·횟수·체크칸을 같은 줄에 */
+.chore { padding: 7px 0; }
+.chore .row { gap: 6px; align-items: center; }
+.nmb { flex: 1; min-width: 0; }
+.chore .nm { display: block; font-size: 15px; line-height: 1.3; }
+.chore .meta { display: block; margin: 0; font-size: 12px; white-space: normal; }
+.pg { display: flex; flex: none; margin-right: -4px; }
+.pipbtn { width: 36px; height: 40px; }
+.pip { width: 26px; height: 26px; border-radius: 8px; }
+.pip svg { width: 15px; height: 15px; }
+.pips { margin: 2px -4px -6px; flex-wrap: wrap; }
+.chore .pipbtn.solo { margin: 0; }
+.filt { margin: 0 0 10px; }
+.hid { text-align: center; font-size: 12px; color: var(--muted); padding: 8px 0 2px; border-top: 1px solid var(--line); }
+
+.person .head[data-act="fold"] { cursor: pointer; }
+.chev { font-style: normal; margin-left: 8px; color: var(--muted); }
+.person.folded > :not(.head):not(.meter) { display: none; }
+
+/* 묶음 제목: 색 막대 + 굵은 제목 + 진행 숫자, 펼친 항목은 안쪽으로 들여씀 */
+.person.a { --c: var(--a); } .person.b { --c: var(--b); }
+.grp { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 0 4px; padding: 11px 12px 11px 14px; border-radius: 12px; border-left: 4px solid var(--c); background: color-mix(in srgb, var(--c) 13%, var(--card)); cursor: pointer; user-select: none; -webkit-user-select: none; }
+.grp:active { filter: brightness(.96); }
+.grp .gn { font-size: 16px; font-weight: 800; letter-spacing: -.2px; color: var(--text); }
+.grp .gs { display: flex; align-items: center; gap: 10px; }
+.grp .gp { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; } .grp .gp b { font-size: 15px; color: var(--text); }
+.grp em { font-style: normal; font-size: 11px; font-weight: 700; color: #b45309; background: color-mix(in srgb, #f59e0b 24%, transparent); padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .grp em { color: #fbbf24; } }
+:root[data-theme="dark"] .grp em { color: #fbbf24; }
+.gchev { flex: none; width: 8px; height: 8px; margin: 0 2px 3px 0; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .2s; }
+.grp.shut .gchev { transform: rotate(-45deg); margin-bottom: 0; }
+.gbody { margin: 0 0 0 7px; padding-left: 12px; border-left: 2px solid color-mix(in srgb, var(--c) 35%, transparent); }
+.gbody .chore { padding: 8px 0; }
+.gbody .chore .nm { font-weight: 500; }
+.filt button { font-size: 14px; }
+
 /* 탭 + 장보기 */
 .tabs { margin: 8px 0 4px; }
 .tabs button { font-size: 15px; }
