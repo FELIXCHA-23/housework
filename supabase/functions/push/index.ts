@@ -6,6 +6,8 @@ import { DEFAULT_CONFIG, kstNow, mondayOf, ownerOf, weekNo, choresOf, pendingTod
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
 webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT') || 'mailto:noreply@example.com', Deno.env.get('VAPID_PUBLIC')!, Deno.env.get('VAPID_PRIVATE')!);
 
+const QUIET_FROM = 0, QUIET_TO = 7; // KST 시(0시 이상 7시 미만)
+
 type Msg = { title: string; body: string; tag?: string };
 
 async function load() {
@@ -41,6 +43,10 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { cfg, checks, devices } = await load();
     const now = kstNow();
+    // 조용한 시간: 한국 시간 00:00~07:00에는 푸시를 보내지 않음 (테스트 푸시는 예외). 이 시간대에 생긴 체크 알림은 버려짐
+    if (body.type !== 'test' && now.hour >= QUIET_FROM && now.hour < QUIET_TO) {
+      return new Response(JSON.stringify({ type: body.type, skipped: 'quiet hours' }), { headers: { 'content-type': 'application/json' } });
+    }
     const wkNow = mondayOf(now.ymd);
     const results: any[] = [];
 
