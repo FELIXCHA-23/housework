@@ -137,7 +137,7 @@ export function sanitizeShop(list) {
     const id = String(x?.id || '').replace(/[^\w-]/g, '').slice(0, 24); const t = String(x?.t ?? '').trim().slice(0, 40);
     if (!id || !t || seen.has(id)) continue; seen.add(id);
     const it = { id, t, by: x.by === 'B' ? 'B' : 'A', c: x.c === 'non' ? 'non' : 'food', at: /^\d{4}-\d{2}-\d{2}$/.test(x.at) ? x.at : '', done: !!x.done };
-    const n = String(x.n ?? '').trim().slice(0, 160); if (n) it.n = n; // 메모(가격 후보 등)
+    const n = String(x.n ?? '').trim().slice(0, 400); if (n) it.n = n; // 메모(가격 후보 등)
     if (it.done && /^\d{4}-\d{2}-\d{2}$/.test(x.dwk)) it.dwk = x.dwk;
     out.push(it);
     if (out.length >= 200) break;

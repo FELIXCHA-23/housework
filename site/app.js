@@ -220,7 +220,7 @@ const tabs = () => { const n = (S.cfg.shop || []).filter((x) => !x.done).length;
 function shopScreen() {
   const list = S.cfg.shop || [], todo = list.filter((x) => !x.done), done = list.filter((x) => x.done);
   const row = (x) => `<div class="srow${x.done ? ' on' : ''}"><button class="sck" data-act="shoptog" data-id="${esc(x.id)}" aria-pressed="${x.done}" aria-label="${esc(x.t)} ${x.done ? '안 산 걸로' : '샀음'}"><span class="pip${x.done ? ' on' : ''}">${x.done ? CHECK_SVG : ''}</span></button>
-    <span class="st">${esc(x.t)}${x.n ? `<small class="sn">${esc(x.n)}</small>` : ''}</span><span class="sby ${x.by.toLowerCase()}">${esc(nm(x.by))}</span><button class="sx" data-act="shopdel" data-id="${esc(x.id)}" aria-label="${esc(x.t)} 삭제">×</button></div>`;
+    <span class="st">${esc(x.t)}${x.n ? `<small class="sn">${esc(x.n).split('\n').map((l) => `<span>${l}</span>`).join('')}</small>` : ''}</span><span class="sby ${x.by.toLowerCase()}">${esc(nm(x.by))}</span><button class="sx" data-act="shopdel" data-id="${esc(x.id)}" aria-label="${esc(x.t)} 삭제">×</button></div>`;
   const cat = S.shopCat || 'food';
   const sec = (c, title, emoji) => { const l = todo.filter((x) => (x.c || 'food') === c); if (!l.length) return '';
     return `<div class="shoph cat ${c}"><span><i>${emoji}</i>${title}</span><em>${l.length}</em></div><section class="card shop">${l.map(row).join('')}</section>`; };

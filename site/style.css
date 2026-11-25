@@ -271,3 +271,5 @@ input:focus, select:focus { border-color: var(--a); }
 
 .st .sn { display: block; margin-top: 2px; font-size: 12px; font-weight: 500; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; }
 .srow { padding-top: 4px; padding-bottom: 4px; }
+.st .sn span { display: block; }
+.st .sn span + span { margin-top: 1px; }
