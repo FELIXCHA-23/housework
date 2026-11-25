@@ -246,7 +246,8 @@ input:focus, select:focus { border-color: var(--a); }
 .tabs { margin: 8px 0 4px; }
 .tabs button { font-size: 15px; }
 .tabs .cnt { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 4px; border-radius: 99px; background: var(--a); color: #fff; font-size: 12px; line-height: 20px; }
-.shopadd { display: flex; gap: 8px; margin: 12px 0; }
+.shopadd { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.addrow { display: flex; gap: 8px; }
 .shopadd input { flex: 1; min-width: 0; font-size: 16px; }
 .shopadd .btn { width: auto; flex: none; padding: 0 18px; }
 .card.shop { padding: 4px 12px; }
@@ -261,3 +262,9 @@ input:focus, select:focus { border-color: var(--a); }
 .sx { width: 40px; height: 44px; font-size: 22px; color: var(--muted); flex: none; margin-right: -8px; }
 .shoph { display: flex; justify-content: space-between; align-items: center; margin: 18px 4px 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .shoph button { color: var(--a); font-size: 14px; font-weight: 600; padding: 6px 4px; }
+
+.catseg button { font-size: 15px; }
+.shoph.cat { margin: 16px 4px 6px; font-size: 14px; color: var(--text); }
+.shoph.cat span { display: flex; align-items: center; gap: 6px; font-weight: 800; }
+.shoph.cat i { font-style: normal; font-size: 16px; }
+.shoph.cat em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--field); padding: 1px 9px; border-radius: 99px; }

@@ -12,7 +12,7 @@ const ls = {
 const sb = window.supabase.createClient(SB_URL, ANON, { auth: { persistSession: false, autoRefreshToken: false }, realtime: { params: { eventsPerSecond: 10 } } });
 
 const S = {
-  key: null, who: null, tab: ls.get('hw_tab') || 'chores', cfg: null, checks: {}, wk: C.mondayOf(C.kstNow().ymd),
+  key: null, who: null, shopCat: ls.get('hw_shopcat') === 'non' ? 'non' : 'food', tab: ls.get('hw_tab') || 'chores', cfg: null, checks: {}, wk: C.mondayOf(C.kstNow().ymd),
   view: 'main', draft: null, online: true, pending: 0, dirty: false, keyError: false,
   push: { supported: false }, armed: false, busy: false,
 };
@@ -221,9 +221,14 @@ function shopScreen() {
   const list = S.cfg.shop || [], todo = list.filter((x) => !x.done), done = list.filter((x) => x.done);
   const row = (x) => `<div class="srow${x.done ? ' on' : ''}"><button class="sck" data-act="shoptog" data-id="${esc(x.id)}" aria-pressed="${x.done}" aria-label="${esc(x.t)} ${x.done ? '안 산 걸로' : '샀음'}"><span class="pip${x.done ? ' on' : ''}">${x.done ? CHECK_SVG : ''}</span></button>
     <span class="st">${esc(x.t)}</span><span class="sby ${x.by.toLowerCase()}">${esc(nm(x.by))}</span><button class="sx" data-act="shopdel" data-id="${esc(x.id)}" aria-label="${esc(x.t)} 삭제">×</button></div>`;
+  const cat = S.shopCat || 'food';
+  const sec = (c, title, emoji) => { const l = todo.filter((x) => (x.c || 'food') === c); if (!l.length) return '';
+    return `<div class="shoph cat ${c}"><span><i>${emoji}</i>${title}</span><em>${l.length}</em></div><section class="card shop">${l.map(row).join('')}</section>`; };
+  const body = sec('food', '식품', '🥬') + sec('non', '비식품', '🧻');
   return `<div class="wrap"><div class="apptitle">집안일 임무분담제</div>${tabs()}
-    <form class="shopadd" data-act="shopadd"><input type="text" name="t" placeholder="살 것 (예: 우유 2개)" maxlength="40" autocomplete="off" enterkeyhint="done" aria-label="살 것"><button class="btn primary" type="submit">추가</button></form>
-    <section class="card shop">${todo.map(row).join('') || '<div class="empty">살 게 없어요. 위에 적으면 상대 폰에도 바로 보여요.</div>'}</section>
+    <form class="shopadd" data-act="shopadd"><div class="seg catseg" role="group" aria-label="종류">${[['food', '식품'], ['non', '비식품']].map(([v, l]) => `<button type="button" data-act="shopcat" data-v="${v}" aria-pressed="${cat === v}" class="${cat === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <div class="addrow"><input type="text" name="t" placeholder="${cat === 'food' ? '식품 (예: 우유 2개)' : '비식품 (예: 휴지)'}" maxlength="40" autocomplete="off" enterkeyhint="done" aria-label="살 것"><button class="btn primary" type="submit">추가</button></div></form>
+    ${body || '<section class="card shop"><div class="empty">살 게 없어요. 위에 적으면 상대 폰에도 바로 보여요.</div></section>'}
     ${done.length ? `<div class="shoph"><span>산 것 ${done.length}개</span><button data-act="shopclear">산 것 지우기</button></div><section class="card shop">${done.map(row).join('')}</section>` : ''}
     <p class="note">체크한 건 다음 주 월요일에 자동으로 지워지고, 안 산 건 그대로 남아요.</p>
     ${list.length ? `<button class="btn danger${S.shopArmed ? ' armed' : ''}" data-act="shopall" style="margin-top:12px">${S.shopArmed ? '정말 다 지울까요? 한 번 더 누르세요' : '목록 전체 비우기'}</button>` : ''}</div>`;
@@ -309,6 +314,7 @@ document.addEventListener('click', async (e) => {
   if (a === 'gfold') { (S.gfold ||= {})[el.dataset.k] = !S.gfold[el.dataset.k]; return render(); }
   if (a === 'filter') { S.filter = el.dataset.v; ls.set('hw_filter', S.filter); return render(); }
   if (a === 'tab') { S.tab = el.dataset.v; ls.set('hw_tab', S.tab); window.scrollTo(0, 0); return render(); }
+  if (a === 'shopcat') { S.shopCat = el.dataset.v; ls.set('hw_shopcat', S.shopCat); return render(); }
   if (a === 'shoptog') { const id = el.dataset.id, x = (S.cfg.shop || []).find((i) => i.id === id); if (!x) return; const v = !x.done, wkNow = C.mondayOf(C.kstNow().ymd);
     return mutateShop((l) => l.map((i) => (i.id === id ? { ...i, done: v, dwk: v ? wkNow : undefined } : i))); }
   if (a === 'shopdel') { const id = el.dataset.id; return mutateShop((l) => l.filter((i) => i.id !== id)); }
@@ -355,7 +361,7 @@ document.addEventListener('change', (e) => { if (e.target.dataset?.n) renderSett
 document.addEventListener('submit', (e) => {
   const sf = e.target.closest('form[data-act="shopadd"]');
   if (sf) { e.preventDefault(); const inp = sf.querySelector('input'); const t = inp.value.trim(); if (!t) return;
-    const item = { id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), t: t.slice(0, 40), by: S.who, at: C.kstNow().ymd, done: false };
+    const item = { id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), t: t.slice(0, 40), c: S.shopCat || 'food', by: S.who, at: C.kstNow().ymd, done: false };
     inp.value = ''; mutateShop((l) => [...l, item]); return; }
   const f = e.target.closest('form[data-act="key"]'); if (!f) return; e.preventDefault();
   const k = new FormData(f).get('k').trim(); if (!k) return;
