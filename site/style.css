@@ -268,3 +268,6 @@ input:focus, select:focus { border-color: var(--a); }
 .shoph.cat span { display: flex; align-items: center; gap: 6px; font-weight: 800; }
 .shoph.cat i { font-style: normal; font-size: 16px; }
 .shoph.cat em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--field); padding: 1px 9px; border-radius: 99px; }
+
+.st .sn { display: block; margin-top: 2px; font-size: 12px; font-weight: 500; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; }
+.srow { padding-top: 4px; padding-bottom: 4px; }
