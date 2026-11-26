@@ -285,3 +285,23 @@ input:focus, select:focus { border-color: var(--a); }
 .hlegend .pip { width: 18px; height: 18px; border-radius: 6px; display: inline-grid; box-shadow: none; }
 .hlegend .pip svg { width: 11px; height: 11px; }
 .hpill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: var(--h); background: color-mix(in srgb, var(--h) 16%, transparent); }
+
+/* 도움 기록 화면 */
+.tabs button { padding: 0 4px; }
+.hrange { margin: 10px 0; }
+.hsum { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.htile { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); border-top: 4px solid var(--c); }
+.htile.a { --c: var(--a); } .htile.b { --c: var(--b); }
+.htile .nm { font-size: 13px; font-weight: 700; color: var(--c); }
+.htile b { font-size: 28px; line-height: 1.15; letter-spacing: -.5px; } .htile b small { font-size: 14px; font-weight: 600; color: var(--muted); margin-left: 2px; }
+.htile .mn { font-size: 13px; color: var(--muted); }
+.card.hlist { padding: 6px 14px 10px; }
+.hday { margin: 14px 0 4px; padding-bottom: 4px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 800; color: var(--h); }
+.hday:first-child { margin-top: 6px; }
+.hrow { display: grid; grid-template-columns: 44px 1fr; gap: 0 8px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.hrow:last-child { border-bottom: 0; }
+.hrow .ht { grid-row: span 2; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hrow .hw { font-size: 12px; color: var(--muted); }
+.hrow .hw b.a { color: var(--a); } .hrow .hw b.b { color: var(--b); }
+.hrow .hn { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; } .hrow .hn small { margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.hrow .hn em { margin-left: 6px; font-style: normal; font-size: 12px; font-weight: 800; color: var(--h); background: color-mix(in srgb, var(--h) 16%, transparent); padding: 1px 7px; border-radius: 99px; }

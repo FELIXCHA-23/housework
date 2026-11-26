@@ -115,6 +115,7 @@ export function sanitizeConfig(c) {
   if (c?.m73) out.m73 = true;
   out.shop = sanitizeShop(c?.shop);
   out.help = sanitizeHelp(c?.help);
+  out.hlog = sanitizeHlog(c?.hlog);
   const seen = new Set();
   for (const x of c?.chores || []) {
     let id = String(x.id || '').replace(/[^\w-]/g, '').slice(0, 24) || 'c' + Math.random().toString(36).slice(2, 8);
@@ -150,12 +151,14 @@ export const pruneShop = (list, wkNow) => list.filter((x) => !(x.done && x.dwk &
 
 // 도와준 체크 기록: { 'YYYY-MM-DD|집안일id': [칸번호, ...] }  (담당이 아닌 사람이 대신 체크한 칸)
 export function sanitizeHelp(h) {
-  const out = {}; let n = 0;
+  const out = {};
   if (h && typeof h === 'object') for (const [k, v] of Object.entries(h)) {
     if (!/^\d{4}-\d{2}-\d{2}\|[\w-]{1,24}$/.test(k) || !Array.isArray(v)) continue;
     const a = [...new Set(v.map(Number).filter((i) => Number.isInteger(i) && i >= 1 && i <= 14))].sort((x, y) => x - y);
-    if (a.length) { out[k] = a; if (++n >= 600) break; }
+    if (a.length) out[k] = a;
   }
+  const keys = Object.keys(out).sort(); // 오래된 것부터 정리
+  for (const k of keys.slice(0, Math.max(0, keys.length - 1500))) delete out[k];
   return out;
 }
 // 체크 수가 prev→next로 바뀔 때 기록 갱신: 늘어난 칸은 helper가 했으면 기록, 아니면 기록 제거. 줄어든 칸은 기록 제거.
@@ -165,5 +168,33 @@ export function applyHelp(help, wk, id, prev, next, helper) {
   else for (let i = next + 1; i <= prev; i++) cur.delete(i);
   const out = { ...help }; if (cur.size) out[k] = [...cur].sort((a, b) => a - b); else delete out[k]; return out;
 }
-export const pruneHelp = (help, wkNow) => { const min = addDays(wkNow, -42); return Object.fromEntries(Object.entries(help || {}).filter(([k]) => k.slice(0, 10) >= min)); };
+export const pruneHelp = (help, wkNow) => { const min = addDays(wkNow, -182); return Object.fromEntries(Object.entries(help || {}).filter(([k]) => k.slice(0, 10) >= min)); };
 export const helpCount = (help, wk, list, checks) => list.reduce((a, c) => a + (help?.[wk + '|' + c.id] || []).filter((i) => i <= Math.min(checks[c.id] || 0, c.per)).length, 0);
+
+// 도움 기록(영구 보관): [{ wk, c:집안일id, i:칸번호, n:이름, m:1회 분, by:'A'|'B'(도와준 사람), at:'YYYY-MM-DDTHH:MM'(한국시간) }]
+export function sanitizeHlog(list) {
+  const out = []; const seen = new Set();
+  for (const x of Array.isArray(list) ? list : []) {
+    const wk = String(x?.wk || ''), c = String(x?.c || '').replace(/[^\w-]/g, '').slice(0, 24), i = Number(x?.i), at = String(x?.at || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(wk) || !c || !Number.isInteger(i) || i < 1 || i > 14 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at)) continue;
+    const k = wk + '|' + c + '|' + i; if (seen.has(k)) continue; seen.add(k);
+    out.push({ wk, c, i, n: String(x.n ?? '').slice(0, 40), m: Math.min(999, Math.max(0, Math.round(Number(x.m) || 0))), by: x.by === 'B' ? 'B' : 'A', at });
+  }
+  out.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  return out.slice(-1000);
+}
+export const kstStamp = (nowMs = Date.now()) => new Date(nowMs + 9 * 3600000).toISOString().slice(0, 16);
+// 체크 수 prev→next: 도와준 사람이 늘리면 기록 추가, 줄이면(해제) 그 칸의 기록 삭제
+export function applyHlog(log, o) {
+  let out = log.filter((e) => !(e.wk === o.wk && e.c === o.id && e.i > o.next && o.next < o.prev));
+  if (o.next > o.prev && o.helper) for (let i = o.prev + 1; i <= o.next; i++) if (!out.some((e) => e.wk === o.wk && e.c === o.id && e.i === i)) out.push({ wk: o.wk, c: o.id, i, n: o.name, m: o.min, by: o.by, at: o.at });
+  return out;
+}
+// 기간별 요약: range 'week'|'month'|'all', today 'YYYY-MM-DD'
+export function helpSummary(log, range, today) {
+  const inR = (e) => range === 'all' || (range === 'month' ? e.at.slice(0, 7) === today.slice(0, 7) : mondayOf(e.at.slice(0, 10)) === mondayOf(today));
+  const list = log.filter(inR).sort((a, b) => (a.at < b.at ? 1 : -1));
+  const sum = { A: { n: 0, m: 0 }, B: { n: 0, m: 0 } };
+  for (const e of list) { sum[e.by].n++; sum[e.by].m += e.m; }
+  return { list, sum };
+}

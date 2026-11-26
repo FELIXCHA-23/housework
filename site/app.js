@@ -12,7 +12,7 @@ const ls = {
 const sb = window.supabase.createClient(SB_URL, ANON, { auth: { persistSession: false, autoRefreshToken: false }, realtime: { params: { eventsPerSecond: 10 } } });
 
 const S = {
-  key: null, who: null, shopCat: ls.get('hw_shopcat') === 'non' ? 'non' : 'food', tab: ls.get('hw_tab') || 'chores', cfg: null, checks: {}, wk: C.mondayOf(C.kstNow().ymd),
+  key: null, who: null, shopCat: ls.get('hw_shopcat') === 'non' ? 'non' : 'food', tab: ['shop', 'help'].includes(ls.get('hw_tab')) ? ls.get('hw_tab') : 'chores', helpRange: ['week', 'all'].includes(ls.get('hw_hr')) ? ls.get('hw_hr') : 'month', cfg: null, checks: {}, wk: C.mondayOf(C.kstNow().ymd),
   view: 'main', draft: null, online: true, pending: 0, dirty: false, keyError: false,
   push: { supported: false }, armed: false, busy: false,
 };
@@ -83,10 +83,11 @@ function renderPartialOnline() { /* 설정 편집 중엔 화면을 다시 그리
 
 let cfgQ = Promise.resolve(); // 설정(장보기·도움 기록) 저장을 한 번에 하나씩 → 서로 덮어쓰지 않게
 const serial = (fn) => (cfgQ = cfgQ.then(fn, fn));
-async function saveHelp(wk, id, prev, next, helper) {
+async function saveHelp(wk, id, prev, next, helper, chore) {
   return serial(async () => {
     const { data, error } = await rpc('hw_get'); if (error) throw error;
     const fresh = C.sanitizeConfig(data.config || S.cfg); fresh.help = C.pruneHelp(C.applyHelp(fresh.help || {}, wk, id, prev, next, helper), C.mondayOf(C.kstNow().ymd));
+    fresh.hlog = C.sanitizeHlog(C.applyHlog(fresh.hlog || [], { wk, id, prev, next, helper, name: chore.name, min: chore.min, by: S.who, at: C.kstStamp() }));
     const r = await rpc('hw_save_config', { p_data: fresh }); if (r.error) throw r.error;
     S.cfg = fresh;
   });
@@ -100,7 +101,7 @@ async function setCheck(chore, next) {
   S.cfg.help = helpAfter;
   cur[chore.id] = next; S.pending++; render(); S.fresh.clear();
   let { error } = await rpc('hw_set_check', { p_wk: wk, p_chore: chore.id, p_done: next, p_who: S.who });
-  if (!error && helpChanged) { try { await saveHelp(wk, chore.id, prev, next, helper); } catch (e) { error = e; } }
+  if (!error && helpChanged) { try { await saveHelp(wk, chore.id, prev, next, helper, chore); } catch (e) { error = e; } }
   S.pending--;
   if (error) { cur[chore.id] = prev; S.cfg.help = helpBefore; if (isAuthErr(error)) onError(error); else { toast('저장 실패 — 연결을 확인해 주세요'); S.online = false; } render(); }
   else if (S.pending === 0 && S.dirty) { S.dirty = false; refresh(); }
@@ -167,7 +168,7 @@ function render() {
   if (!S.who) return (app.innerHTML = whoScreen());
   if (S.view === 'settings') return renderSettings();
   const ae = document.activeElement, keep = ae && ae.matches?.('.shopadd input') ? { v: ae.value, s: ae.selectionStart } : null; // 입력 중 동기화돼도 글자 유지
-  const st = window.scrollY; app.innerHTML = S.tab === 'shop' ? shopScreen() : mainScreen(); window.scrollTo(0, st);
+  const st = window.scrollY; app.innerHTML = S.tab === 'shop' ? shopScreen() : S.tab === 'help' ? helpScreen() : mainScreen(); window.scrollTo(0, st);
   if (keep) { const i = $('.shopadd input'); if (i) { i.value = keep.v; i.focus(); try { i.setSelectionRange(keep.s, keep.s); } catch { /* noop */ } } }
   if (!S.introDone) { app.firstElementChild.classList.add('intro'); S.introDone = true; } // 첫 화면에서만 Stagger
 }
@@ -230,9 +231,30 @@ function mainScreen() {
     ${order.map(person).join('')}</div>`;
 }
 
+// ───────── 도움 기록 (상대가 대신 해 준 일을 영구 보관)
+function helpScreen() {
+  const { list, sum } = C.helpSummary(S.cfg.hlog || [], S.helpRange, C.kstNow().ymd);
+  const wd = (ymd) => '일월화수목금토'[new Date(ymd + 'T00:00:00Z').getUTCDay()];
+  const tile = (s) => `<div class="htile ${s.toLowerCase()}"><span class="nm">${esc(nm(s))}가 도와줌</span><b>${sum[s].n}<small>회</small></b><span class="mn">${C.fmtMin(sum[s].m)}</span></div>`;
+  // 같은 시각·같은 사람이 같은 일을 여러 칸 체크한 건 한 줄로 묶음 (예: 설거지 ×2)
+  const groups = []; for (const e of list.slice(0, 600)) { const g = groups.at(-1); if (g && g.at === e.at && g.by === e.by && g.c === e.c) { g.k++; g.m += e.m; } else groups.push({ ...e, k: 1 }); }
+  let day = '', rows = '';
+  for (const e of groups.slice(0, 300)) {
+    const d = e.at.slice(0, 10);
+    if (d !== day) { day = d; rows += `<div class="hday">${Number(d.slice(5, 7))}/${Number(d.slice(8))} (${wd(d)})</div>`; }
+    const o = C.other(e.by);
+    rows += `<div class="hrow"><span class="ht">${e.at.slice(11)}</span><span class="hw"><b class="${e.by.toLowerCase()}">${esc(nm(e.by))}</b> → <b class="${o.toLowerCase()}">${esc(nm(o))}</b></span><span class="hn">${esc(e.n)}${e.k > 1 ? `<em>×${e.k}</em>` : ''}${e.m ? `<small>${e.m}분</small>` : ''}</span></div>`;
+  }
+  return `<div class="wrap"><div class="apptitle">집안일 임무분담제</div>${tabs()}
+    <div class="seg hrange" role="group" aria-label="기간">${[['week', '이번 주'], ['month', '이번 달'], ['all', '전체']].map(([v, l]) => `<button data-act="hrange" data-v="${v}" class="${S.helpRange === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="hsum">${tile('A')}${tile('B')}</div>
+    <section class="card hlist">${rows || '<div class="empty">아직 도와준 기록이 없어요.<br>상대 담당 일을 대신 체크하면 여기에 쌓여요.</div>'}</section>
+    <p class="note">상대 담당 일을 대신 체크하면 자동으로 기록돼요. 체크를 해제하면 그 기록도 사라지고, 전체 초기화를 해도 도움 기록은 남아요.</p></div>`;
+}
+
 // ───────── 장보기 (둘이 같이 쓰는 목록)
 const tabs = () => { const n = (S.cfg.shop || []).filter((x) => !x.done).length;
-  return `<div class="seg tabs" role="tablist">${[['chores', '집안일'], ['shop', `장보기${n ? ` <span class="cnt">${n}</span>` : ''}`]].map(([v, l]) => `<button role="tab" data-act="tab" data-v="${v}" aria-selected="${(S.tab || 'chores') === v}" class="${(S.tab || 'chores') === v ? 'on' : ''}">${l}</button>`).join('')}</div>`; };
+  return `<div class="seg tabs" role="tablist">${[['chores', '집안일'], ['shop', `장보기${n ? ` <span class="cnt">${n}</span>` : ''}`], ['help', '🤝 도움']].map(([v, l]) => `<button role="tab" data-act="tab" data-v="${v}" aria-selected="${(S.tab || 'chores') === v}" class="${(S.tab || 'chores') === v ? 'on' : ''}">${l}</button>`).join('')}</div>`; };
 function shopScreen() {
   const list = S.cfg.shop || [], todo = list.filter((x) => !x.done), done = list.filter((x) => x.done);
   const row = (x) => `<div class="srow${x.done ? ' on' : ''}"><button class="sck" data-act="shoptog" data-id="${esc(x.id)}" aria-pressed="${x.done}" aria-label="${esc(x.t)} ${x.done ? '안 산 걸로' : '샀음'}"><span class="pip${x.done ? ' on' : ''}">${x.done ? CHECK_SVG : ''}</span></button>
@@ -313,7 +335,7 @@ function renderSettings() {
 }
 async function saveCfg(cfg, msg) {
   const clean = C.sanitizeConfig(cfg);
-  { const f = await rpc('hw_get'); clean.shop = C.sanitizeShop(f.data?.config?.shop ?? S.cfg.shop); clean.help = C.sanitizeHelp(f.data?.config?.help ?? S.cfg.help); } // 편집 중 바뀐 장보기 목록을 덮어쓰지 않게
+  { const f = await rpc('hw_get'); clean.shop = C.sanitizeShop(f.data?.config?.shop ?? S.cfg.shop); clean.help = C.sanitizeHelp(f.data?.config?.help ?? S.cfg.help); clean.hlog = C.sanitizeHlog(f.data?.config?.hlog ?? S.cfg.hlog); } // 편집 중 바뀐 장보기 목록을 덮어쓰지 않게
   const { error } = await rpc('hw_save_config', { p_data: clean });
   if (error) { if (isAuthErr(error)) return onError(error); return toast('저장 실패 — 연결을 확인해 주세요'); }
   closeSheet(() => { S.cfg = clean; S.draft = null; S.view = 'main'; toast(msg || '저장했어요'); render(); refresh(); });
@@ -341,6 +363,7 @@ document.addEventListener('click', async (e) => {
     if (!S.shopArmed) { S.shopArmed = true; render(); setTimeout(() => { if (S.shopArmed) { S.shopArmed = false; render(); } }, 4000); return; }
     S.shopArmed = false; const ids = new Set((S.cfg.shop || []).map((i) => i.id)); return mutateShop((l) => l.filter((i) => !ids.has(i.id)));
   }
+  if (a === 'hrange') { S.helpRange = el.dataset.v; ls.set('hw_hr', S.helpRange); return render(); }
   if (a === 'prev') { S.wk = C.addDays(S.wk, -7); return render(); }
   if (a === 'next') { S.wk = C.addDays(S.wk, 7); return render(); }
   if (a === 'today') { S.wk = C.mondayOf(C.kstNow().ymd); return render(); }
@@ -363,9 +386,9 @@ document.addEventListener('click', async (e) => {
   if (a === 'reset') {
     if (!S.armed) { S.armed = true; renderSettings(); setTimeout(() => { if (S.armed) { S.armed = false; if (S.view === 'settings') renderSettings(); } }, 4000); return; }
     S.armed = false;
-    const { error } = await rpc('hw_reset', { p_data: { ...C.cloneDefault(), shop: S.cfg.shop || [] } });
+    const { error } = await rpc('hw_reset', { p_data: { ...C.cloneDefault(), shop: S.cfg.shop || [], hlog: S.cfg.hlog || [] } });
     if (error) return toast('초기화 실패 — 연결을 확인해 주세요');
-    S.cfg = { ...C.cloneDefault(), shop: S.cfg.shop || [] }; S.checks = {}; S.draft = null; S.view = 'main'; S.wk = C.mondayOf(C.kstNow().ymd); toast('초기화했어요'); render(); return;
+    S.cfg = { ...C.cloneDefault(), shop: S.cfg.shop || [], hlog: S.cfg.hlog || [] }; S.checks = {}; S.draft = null; S.view = 'main'; S.wk = C.mondayOf(C.kstNow().ymd); toast('초기화했어요'); render(); return;
   }
 });
 document.addEventListener('input', (e) => {
