@@ -81,14 +81,28 @@ function lastTxt(s) {
 }
 function renderPartialOnline() { /* 설정 편집 중엔 화면을 다시 그리지 않음 */ }
 
+let cfgQ = Promise.resolve(); // 설정(장보기·도움 기록) 저장을 한 번에 하나씩 → 서로 덮어쓰지 않게
+const serial = (fn) => (cfgQ = cfgQ.then(fn, fn));
+async function saveHelp(wk, id, prev, next, helper) {
+  return serial(async () => {
+    const { data, error } = await rpc('hw_get'); if (error) throw error;
+    const fresh = C.sanitizeConfig(data.config || S.cfg); fresh.help = C.pruneHelp(C.applyHelp(fresh.help || {}, wk, id, prev, next, helper), C.mondayOf(C.kstNow().ymd));
+    const r = await rpc('hw_save_config', { p_data: fresh }); if (r.error) throw r.error;
+    S.cfg = fresh;
+  });
+}
 async function setCheck(chore, next) {
   const wk = S.wk; const cur = (S.checks[wk] ||= {});
   const prev = cur[chore.id] || 0; if (next === prev) return;
   for (let i = prev + 1; i <= next; i++) S.fresh.add(chore.id + ':' + i); // 새로 체크된 칸만 애니메이션
+  const helper = S.who !== C.ownerOf(chore, C.weekNo(wk, S.cfg.anchor)); // 담당이 아닌 사람이 체크하면 '도와줌'
+  const helpBefore = S.cfg.help || {}, helpAfter = C.applyHelp(helpBefore, wk, chore.id, prev, next, helper), helpChanged = JSON.stringify(helpBefore[wk + '|' + chore.id] || []) !== JSON.stringify(helpAfter[wk + '|' + chore.id] || []);
+  S.cfg.help = helpAfter;
   cur[chore.id] = next; S.pending++; render(); S.fresh.clear();
-  const { error } = await rpc('hw_set_check', { p_wk: wk, p_chore: chore.id, p_done: next, p_who: S.who });
+  let { error } = await rpc('hw_set_check', { p_wk: wk, p_chore: chore.id, p_done: next, p_who: S.who });
+  if (!error && helpChanged) { try { await saveHelp(wk, chore.id, prev, next, helper); } catch (e) { error = e; } }
   S.pending--;
-  if (error) { cur[chore.id] = prev; if (isAuthErr(error)) onError(error); else { toast('저장 실패 — 연결을 확인해 주세요'); S.online = false; } render(); }
+  if (error) { cur[chore.id] = prev; S.cfg.help = helpBefore; if (isAuthErr(error)) onError(error); else { toast('저장 실패 — 연결을 확인해 주세요'); S.online = false; } render(); }
   else if (S.pending === 0 && S.dirty) { S.dirty = false; refresh(); }
 }
 
@@ -175,9 +189,10 @@ function mainScreen() {
     const dOf = (c) => Math.min(checks[c.id] || 0, c.per);
     const shown = S.filter === 'left' ? list.filter((c) => dOf(c) < c.per) : S.filter === 'zero' ? list.filter((c) => dOf(c) === 0) : list;
     const mine = S.who === s; // 본인 담당만 체크·해제 가능
+    const hc = C.helpCount(S.cfg.help, wk, list, checks); // 이 사람 일을 상대가 도와준 횟수
     const rowHtml = (c) => {
-      const d = dOf(c);
-      const pip = (i) => `<button class="pipbtn${mine ? '' : ' help'}" data-act="pip" data-o="${s}" data-c="${esc(c.id)}" data-i="${i}" aria-pressed="${i <= d}" aria-label="${esc(c.name)} ${i}번째"><span class="pip${i <= d ? ' on' : ''}${i <= d && S.fresh.has(c.id + ':' + i) ? ' draw' : ''}">${i <= d ? CHECK_SVG : ''}</span></button>`;
+      const d = dOf(c); const hs = new Set((S.cfg.help || {})[wk + '|' + c.id] || []);
+      const pip = (i) => `<button class="pipbtn${mine ? '' : ' help'}" data-act="pip" data-o="${s}" data-c="${esc(c.id)}" data-i="${i}" aria-pressed="${i <= d}" aria-label="${esc(c.name)} ${i}번째"><span class="pip${i <= d ? ' on' : ''}${i <= d && hs.has(i) ? ' hp' : ''}${i <= d && S.fresh.has(c.id + ':' + i) ? ' draw' : ''}">${i <= d ? CHECK_SVG : ''}</span></button>`;
       const pips = Array.from({ length: c.per }, (_, i) => pip(i + 1)).join('');
       const inline = c.per <= 3;
       return `<div class="chore${d >= c.per ? ' full' : ''}"><div class="row"><div class="nmb"><span class="nm">${esc(c.name)}</span><span class="meta">${c.min}분${c.per === 1 ? '' : ` × ${c.per} · ${d}/${c.per}`}</span></div>${inline ? `<span class="pg">${pips}</span>` : ''}</div>${inline ? '' : `<div class="pips">${pips}</div>`}</div>`;
@@ -192,7 +207,7 @@ function mainScreen() {
     }).join('');
     const hidden = list.length - shown.length;
     const folded = S.who !== s && !(S.unfold || {})[s]; // 상대방 카드는 기본으로 접어 둠
-    return `<section class="card person ${s.toLowerCase()}${folded ? ' folded' : ''}"><div class="head"${S.who !== s ? ` data-act="fold" data-w="${s}" role="button" tabindex="0"` : ''}><div><h2><span class="dot"></span>${esc(nm(s))}${S.who === s ? '<span class="me">나</span>' : ''}</h2>${lastTxt(s)}</div>
+    return `<section class="card person ${s.toLowerCase()}${folded ? ' folded' : ''}"><div class="head"${S.who !== s ? ` data-act="fold" data-w="${s}" role="button" tabindex="0"` : ''}><div><h2><span class="dot"></span>${esc(nm(s))}${S.who === s ? '<span class="me">나</span>' : ''}${hc ? `<span class="hpill">🤝 도움 ${hc}</span>` : ''}</h2>${lastTxt(s)}</div>
       <span class="prog"><b>${done}</b>/${sumPer}회 · ${C.fmtMin(doneMin)}${S.who !== s ? `<i class="chev">${folded ? '▾' : '▴'}</i>` : ''}</span></div><div class="meter"><i style="width:${sumPer ? (done / sumPer) * 100 : 0}%"></i></div>${rows || `<div class="empty">${list.length ? (S.filter === 'zero' ? '이번 주 안 한 항목이 없어요 🎉' : '남은 일이 없어요 🎉') : '이번 주 담당이 없어요'}</div>`}${hidden && rows ? `<div class="hid">완료한 ${hidden}개 숨김</div>` : ''}</section>`;
   };
   const order = S.who === 'B' ? ['B', 'A'] : ['A', 'B'];
@@ -206,6 +221,7 @@ function mainScreen() {
     <button class="iconbtn" data-act="next" aria-label="다음 주">›</button><button class="iconbtn" data-act="settings" aria-label="설정">⚙︎</button></header>
     <div class="days">${days}</div>
     <div class="seg filt" role="group" aria-label="보기">${[['all', '전체'], ['left', '남은 것만'], ['zero', '안 한 것']].map(([v, l]) => `<button data-act="filter" data-v="${v}" class="${(S.filter || 'all') === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="hlegend"><span class="pip on hp" aria-hidden="true">${CHECK_SVG}</span>보라색 칸 = 상대가 도와준 체크</div>
     ${isNow ? '' : '<div class="today"><button data-act="today">이번 주로 돌아가기</button></div>'}
     <section class="card sum"><div class="names"><div class="who"><span class="nm">${esc(nm('A'))}</span><span class="mn a">${load.A}<small>분</small></span></div>
       <div class="who"><span class="nm">${esc(nm('B'))}</span><span class="mn b">${load.B}<small>분</small></span></div></div>
@@ -238,10 +254,12 @@ async function mutateShop(fn, quiet) {
   S.cfg.shop = fn([...(S.cfg.shop || [])]); if (!quiet) render();
   S.pending++;
   try {
-    const { data, error } = await rpc('hw_get'); if (error) throw error;
-    const fresh = C.sanitizeConfig(data.config || S.cfg); fresh.shop = C.sanitizeShop(fn(fresh.shop || []));
-    const r = await rpc('hw_save_config', { p_data: fresh }); if (r.error) throw r.error;
-    S.cfg = fresh;
+    await serial(async () => {
+      const { data, error } = await rpc('hw_get'); if (error) throw error;
+      const fresh = C.sanitizeConfig(data.config || S.cfg); fresh.shop = C.sanitizeShop(fn(fresh.shop || []));
+      const r = await rpc('hw_save_config', { p_data: fresh }); if (r.error) throw r.error;
+      S.cfg = fresh;
+    });
   } catch (e) { if (isAuthErr(e)) onError(e); else toast('저장 실패 — 연결을 확인해 주세요'); S.dirty = true; }
   S.pending--; if (S.pending === 0 && S.dirty) { S.dirty = false; refresh(); } else if (S.view !== 'settings') render();
 }
@@ -295,7 +313,7 @@ function renderSettings() {
 }
 async function saveCfg(cfg, msg) {
   const clean = C.sanitizeConfig(cfg);
-  { const f = await rpc('hw_get'); clean.shop = C.sanitizeShop(f.data?.config?.shop ?? S.cfg.shop); } // 편집 중 바뀐 장보기 목록을 덮어쓰지 않게
+  { const f = await rpc('hw_get'); clean.shop = C.sanitizeShop(f.data?.config?.shop ?? S.cfg.shop); clean.help = C.sanitizeHelp(f.data?.config?.help ?? S.cfg.help); } // 편집 중 바뀐 장보기 목록을 덮어쓰지 않게
   const { error } = await rpc('hw_save_config', { p_data: clean });
   if (error) { if (isAuthErr(error)) return onError(error); return toast('저장 실패 — 연결을 확인해 주세요'); }
   closeSheet(() => { S.cfg = clean; S.draft = null; S.view = 'main'; toast(msg || '저장했어요'); render(); refresh(); });

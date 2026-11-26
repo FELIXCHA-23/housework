@@ -114,6 +114,7 @@ export function sanitizeConfig(c) {
   };
   if (c?.m73) out.m73 = true;
   out.shop = sanitizeShop(c?.shop);
+  out.help = sanitizeHelp(c?.help);
   const seen = new Set();
   for (const x of c?.chores || []) {
     let id = String(x.id || '').replace(/[^\w-]/g, '').slice(0, 24) || 'c' + Math.random().toString(36).slice(2, 8);
@@ -146,3 +147,23 @@ export function sanitizeShop(list) {
 }
 // 지난주(또는 그 전)에 산 것은 자동으로 정리
 export const pruneShop = (list, wkNow) => list.filter((x) => !(x.done && x.dwk && x.dwk < wkNow));
+
+// 도와준 체크 기록: { 'YYYY-MM-DD|집안일id': [칸번호, ...] }  (담당이 아닌 사람이 대신 체크한 칸)
+export function sanitizeHelp(h) {
+  const out = {}; let n = 0;
+  if (h && typeof h === 'object') for (const [k, v] of Object.entries(h)) {
+    if (!/^\d{4}-\d{2}-\d{2}\|[\w-]{1,24}$/.test(k) || !Array.isArray(v)) continue;
+    const a = [...new Set(v.map(Number).filter((i) => Number.isInteger(i) && i >= 1 && i <= 14))].sort((x, y) => x - y);
+    if (a.length) { out[k] = a; if (++n >= 600) break; }
+  }
+  return out;
+}
+// 체크 수가 prev→next로 바뀔 때 기록 갱신: 늘어난 칸은 helper가 했으면 기록, 아니면 기록 제거. 줄어든 칸은 기록 제거.
+export function applyHelp(help, wk, id, prev, next, helper) {
+  const k = wk + '|' + id; const cur = new Set(help[k] || []);
+  if (next > prev) { for (let i = prev + 1; i <= next; i++) { if (helper) cur.add(i); else cur.delete(i); } }
+  else for (let i = next + 1; i <= prev; i++) cur.delete(i);
+  const out = { ...help }; if (cur.size) out[k] = [...cur].sort((a, b) => a - b); else delete out[k]; return out;
+}
+export const pruneHelp = (help, wkNow) => { const min = addDays(wkNow, -42); return Object.fromEntries(Object.entries(help || {}).filter(([k]) => k.slice(0, 10) >= min)); };
+export const helpCount = (help, wk, list, checks) => list.reduce((a, c) => a + (help?.[wk + '|' + c.id] || []).filter((i) => i <= Math.min(checks[c.id] || 0, c.per)).length, 0);

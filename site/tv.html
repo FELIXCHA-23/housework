@@ -57,6 +57,9 @@ body { font: 2.2vh/1.3 "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", s
 .pipb:focus { outline: .45vh solid #fff; outline-offset: .05vh; }
 .pip { width: var(--pip, 3.2vh); height: var(--pip, 3.2vh); border-radius: 50%; border: .3vh solid var(--line); display: grid; place-items: center; }
 .pip.on { background: var(--c); border-color: var(--c); }
+.pip.on.hp { background: #a78bfa; border-color: #a78bfa; box-shadow: 0 0 0 .4vh rgba(167,139,250,.5); }
+.hlg { display: inline-flex; align-items: center; gap: .8vh; margin-left: 2vh; font-size: 2vh; color: var(--muted); font-weight: 600; }
+.hlg .pip { --pip: 2.2vh; width: 2.2vh; height: 2.2vh; }
 .pip svg { width: 70%; height: 70%; fill: none; stroke: #0e1013; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .empty { color: var(--muted); text-align: center; margin: auto; font-size: 2.6vh; }
 /* 배경음악: 유튜브 임베드 (약관상 영상이 보이는 크기로 우측 상단에 둠) */
@@ -136,9 +139,9 @@ function mainHtml() {
     const done = list.reduce((a, c) => a + Math.min(checks[c.id] || 0, c.per), 0);
     const doneMin = list.reduce((a, c) => a + Math.min(checks[c.id] || 0, c.per) * c.min, 0), totMin = list.reduce((a, c) => a + c.per * c.min, 0);
     const rowHtml = (c) => {
-      const d = Math.min(checks[c.id] || 0, c.per);
+      const d = Math.min(checks[c.id] || 0, c.per); const hs = new Set((cfg.help || {})[wk + '|' + c.id] || []);
       const late = d < C.dueBy(c.per, now.dow);
-      const pips = Array.from({ length: c.per }, (_, i) => `<span class="pipb"><span class="pip${i < d ? ' on' : ''}">${i < d ? CHECK : ''}</span></span>`).join('');
+      const pips = Array.from({ length: c.per }, (_, i) => `<span class="pipb"><span class="pip${i < d ? ' on' : ''}${i < d && hs.has(i + 1) ? ' hp' : ''}">${i < d ? CHECK : ''}</span></span>`).join('');
       return `<div class="row${d >= c.per ? ' full' : ''}${late ? ' late' : ''}"><span class="nm">${esc(c.name)}</span><span class="pips">${pips}</span></div>`;
     };
     // 묶음 제목(진행률) + 항목. 오늘까지 했어야 하는데 못 한 항목은 노란색
@@ -160,7 +163,7 @@ function render() {
   const tops = [...document.querySelectorAll('.list')].map((l) => l.scrollTop);
   let ph = root.querySelector('.photo');
   if (!ph) { root.innerHTML = `<div class="photo none" id="ph"><img id="i0" alt=""><img id="i1" alt=""></div><div class="main" id="mn"></div>`; photoReady(); }
-  $('#mn').innerHTML = `<div class="top"><div><h1>집안일 임무분담제</h1><span class="wk">${m.wlabel}</span></div><div class="clock"><b>${m.time}</b><span>${m.date}</span></div></div>
+  $('#mn').innerHTML = `<div class="top"><div><h1>집안일 임무분담제</h1><span class="wk">${m.wlabel}</span><span class="hlg"><span class="pip on hp">${CHECK}</span>보라색 = 상대가 도와줌</span></div><div class="clock"><b>${m.time}</b><span>${m.date}</span></div></div>
     <div class="days">${m.days}</div><div class="cols">${m.cols}</div>`;
   fit(); placeYt();
   document.querySelectorAll('.list').forEach((l, i) => { if (tops[i]) { l.scrollTop = tops[i]; const st = SC.get(l); if (st) st.y = tops[i]; } });
