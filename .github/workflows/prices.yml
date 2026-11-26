@@ -1,0 +1,16 @@
+name: Update shopping prices
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # 30분마다 (GitHub 사정으로 수 분 늦을 수 있음)
+  workflow_dispatch: {}
+permissions: { contents: read }
+concurrency: { group: prices, cancel-in-progress: false }
+jobs:
+  prices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: node scripts/update-prices.mjs

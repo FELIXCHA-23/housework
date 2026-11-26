@@ -267,7 +267,7 @@ function shopScreen() {
       <div class="addrow"><input type="text" name="t" placeholder="${cat === 'food' ? '식품 (예: 우유 2개)' : '비식품 (예: 휴지)'}" maxlength="40" autocomplete="off" enterkeyhint="done" aria-label="살 것"><button class="btn primary" type="submit">추가</button></div></form>
     ${body || '<section class="card shop"><div class="empty">살 게 없어요. 위에 적으면 상대 폰에도 바로 보여요.</div></section>'}
     ${done.length ? `<div class="shoph"><span>산 것 ${done.length}개</span><button data-act="shopclear">산 것 지우기</button></div><section class="card shop">${done.map(row).join('')}</section>` : ''}
-    <p class="note">체크한 건 다음 주 월요일에 자동으로 지워지고, 안 산 건 그대로 남아요.</p>
+    <p class="note">체크한 건 다음 주 월요일에 자동으로 지워지고, 안 산 건 그대로 남아요.<br>안 산 항목의 가격(식품: 컬리, 비식품: 다이소몰)은 30분마다 자동으로 갱신돼요.</p>
     ${list.length ? `<button class="btn danger${S.shopArmed ? ' armed' : ''}" data-act="shopall" style="margin-top:12px">${S.shopArmed ? '정말 다 지울까요? 한 번 더 누르세요' : '목록 전체 비우기'}</button>` : ''}</div>`;
 }
 // 서버 최신본에 같은 변경을 적용해서 저장(둘이 동시에 고쳐도 서로 덮어쓰지 않게)
