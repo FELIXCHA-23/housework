@@ -222,7 +222,6 @@ function mainScreen() {
     <button class="iconbtn" data-act="next" aria-label="다음 주">›</button><button class="iconbtn" data-act="settings" aria-label="설정">⚙︎</button></header>
     <div class="days">${days}</div>
     <div class="seg filt" role="group" aria-label="보기">${[['all', '전체'], ['left', '남은 것만'], ['zero', '안 한 것']].map(([v, l]) => `<button data-act="filter" data-v="${v}" class="${(S.filter || 'all') === v ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <div class="hlegend"><span class="pip on hp" aria-hidden="true">${CHECK_SVG}</span>보라색 칸 = 상대가 도와준 체크</div>
     ${isNow ? '' : '<div class="today"><button data-act="today">이번 주로 돌아가기</button></div>'}
     <section class="card sum"><div class="names"><div class="who"><span class="nm">${esc(nm('A'))}</span><span class="mn a">${load.A}<small>분</small></span></div>
       <div class="who"><span class="nm">${esc(nm('B'))}</span><span class="mn b">${load.B}<small>분</small></span></div></div>
